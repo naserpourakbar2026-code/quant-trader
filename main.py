@@ -12,7 +12,7 @@ from datetime import datetime
 
 from src.backtest.backtrader_engine import compare_with_screening, run_validation as run_backtrader_validation
 from src.backtest.vectorbt_engine import run_screening
-from src.core.config import is_live_trading_enabled, load_brokers, load_settings, load_strategies
+from src.core.config import PROJECT_ROOT, is_live_trading_enabled, load_brokers, load_settings, load_strategies
 from src.core.logging import configure_logging, get_system_logger
 from src.data.csv_loader import load_csv
 from src.data.ingestion import run_download
@@ -21,13 +21,13 @@ from src.execution.paper_trading import run_paper_trading_session
 from src.montecarlo.mc_engine import run_monte_carlo
 from src.optimization.optuna_engine import assess_parameter_stability, run_optimization
 from src.portfolio.portfolio_engine import run_portfolio_analysis
+from src.reporting.report_engine import run_report
 from src.risk.kill_switch import KillSwitch
 from src.walkforward.wfa_engine import run_walk_forward
 
 # command -> (implemented, scheduled phase)
 COMMAND_PHASES: dict[str, tuple[bool, int]] = {
     "live": (False, 14),
-    "report": (False, 16),
 }
 
 
@@ -417,6 +417,18 @@ def cmd_kill_switch(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_report(_args: argparse.Namespace) -> int:
+    """Generate the self-contained HTML report plus CSV/JSON exports
+    from every persisted engine's results so far (Phase 16, CLAUDE.md
+    Section 30). Opening reports/report.html in a browser is enough to
+    view the outcome — no server, no notebook, no further command."""
+    result = run_report()
+    for path in [result.html_path, *result.csv_paths, result.json_path]:
+        print(f"Wrote {path.relative_to(PROJECT_ROOT)}")
+    print("\nOpen the HTML file directly in a browser to view the results.")
+    return 0
+
+
 def _not_implemented(name: str, phase: int) -> int:
     logger = get_system_logger()
     message = (
@@ -536,6 +548,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     kill_switch_parser.add_argument("--history", type=int, default=10, help="Number of past events to show (default: 10)")
     kill_switch_parser.set_defaults(func=cmd_kill_switch)
+
+    report_parser = subparsers.add_parser(
+        "report", help="Generate the self-contained HTML report + CSV/JSON exports (Phase 16)"
+    )
+    report_parser.set_defaults(func=cmd_report)
 
     for name, (_implemented, phase) in COMMAND_PHASES.items():
         sub = subparsers.add_parser(name, help=f"(pending — Phase {phase})")

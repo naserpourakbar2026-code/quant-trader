@@ -50,9 +50,9 @@
     <p class="subtitle">Static snapshot — open this file directly, no server or code execution needed.</p>
 
     <div class="card">
-      <strong>Current phase:</strong> Phase 16 — Reporting
-      <div class="progress-bar"><div class="progress-fill" style="width:83%"></div></div>
-      <div style="color:var(--muted); font-size:0.85rem;">15 of 18 phases done</div>
+      <strong>Current phase:</strong> Phase 17 — Full integration tests
+      <div class="progress-bar"><div class="progress-fill" style="width:89%"></div></div>
+      <div style="color:var(--muted); font-size:0.85rem;">16 of 18 phases done</div>
     </div>
 
     <div class="card">
@@ -135,10 +135,10 @@
         <td>Risk &amp; kill switch</td>
         <td><span class="badge done">Done</span></td>
       </tr>
-      <tr class="pending">
+      <tr class="done">
         <td>16</td>
         <td>Reporting</td>
-        <td><span class="badge pending">Pending</span></td>
+        <td><span class="badge done">Done</span></td>
       </tr>
       <tr class="pending">
         <td>17</td>
@@ -155,7 +155,7 @@
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0;">Files created so far (112)</h2>
+      <h2 style="margin-top:0;">Files created so far (117)</h2>
       <div class="group">
         <h3>(root)/</h3>
         <ul>
@@ -251,7 +251,10 @@
           <li>src/portfolio/run_store.py</li>
           <li>src/reporting/__init__.py</li>
           <li>src/risk/__init__.py</li>
+          <li>src/risk/correlated_exposure.py</li>
           <li>src/risk/engine.py</li>
+          <li>src/risk/kill_switch.py</li>
+          <li>src/risk/models.py</li>
           <li>src/strategies/__init__.py</li>
           <li>src/strategies/base.py</li>
           <li>src/strategies/mean_reversion.py</li>
@@ -273,6 +276,7 @@
           <li>tests/test_broker_base.py</li>
           <li>tests/test_cli.py</li>
           <li>tests/test_config.py</li>
+          <li>tests/test_correlated_exposure.py</li>
           <li>tests/test_csv_loader.py</li>
           <li>tests/test_data_schema.py</li>
           <li>tests/test_db.py</li>
@@ -282,6 +286,7 @@
           <li>tests/test_generic_rest_adapter.py</li>
           <li>tests/test_indicators.py</li>
           <li>tests/test_ingestion.py</li>
+          <li>tests/test_kill_switch.py</li>
           <li>tests/test_mc_engine.py</li>
           <li>tests/test_mean_reversion.py</li>
           <li>tests/test_momentum.py</li>
@@ -310,7 +315,7 @@
       </div>
     </div>
 
-    <footer>Generated 2026-09-14 16:57 UTC by scripts/generate_progress_report.py</footer>
+    <footer>Generated 2026-09-14 17:14 UTC by scripts/generate_progress_report.py</footer>
   </div>
 </body>
 </html>

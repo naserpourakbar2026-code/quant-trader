@@ -141,6 +141,11 @@ def test_run_monte_carlo_end_to_end(db):
     assert records[0].run_id == result.run_id
     assert records[0].n_trades_observed == result.n_trades_observed
 
+    assert result.return_histogram["counts"]
+    assert sum(result.return_histogram["counts"]) == result.n_simulations
+    assert len(result.return_histogram["bin_edges"]) == len(result.return_histogram["counts"]) + 1
+    assert records[0].return_histogram == result.return_histogram
+
 
 def test_run_monte_carlo_persist_false_does_not_write_to_db(db):
     raw = _synthetic_raw_candles()

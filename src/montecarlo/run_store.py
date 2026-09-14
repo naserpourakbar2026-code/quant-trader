@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from src.core.db import Database, get_default_database
@@ -46,6 +46,7 @@ class MonteCarloRecord:
     probability_of_negative_return: float
     is_fragile: bool
     parameters: dict
+    return_histogram: dict = field(default_factory=dict)
     code_version: str = "unknown"
     python_version: str = "unknown"
     library_versions: dict | None = None
@@ -79,6 +80,7 @@ def save_run(record: MonteCarloRecord, db: Database | None = None) -> None:
                 probability_of_negative_return=record.probability_of_negative_return,
                 is_fragile=record.is_fragile,
                 parameters_json=json.dumps(_json_safe(record.parameters)),
+                return_histogram_json=json.dumps(_json_safe(record.return_histogram)),
                 code_version=record.code_version,
                 python_version=record.python_version,
                 library_versions_json=json.dumps(record.library_versions or {}),
@@ -111,6 +113,7 @@ def _to_record(row: MonteCarloRun) -> MonteCarloRecord:
         probability_of_negative_return=row.probability_of_negative_return,
         is_fragile=row.is_fragile,
         parameters=json.loads(row.parameters_json),
+        return_histogram=json.loads(row.return_histogram_json) if row.return_histogram_json else {},
         code_version=row.code_version,
         python_version=row.python_version,
         library_versions=json.loads(row.library_versions_json),

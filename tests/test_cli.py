@@ -11,6 +11,7 @@ from main import (
     cmd_optimize,
     cmd_paper_trade,
     cmd_portfolio,
+    cmd_report,
     cmd_validate_data,
     cmd_walk_forward,
 )
@@ -28,7 +29,7 @@ def test_info_command_runs_and_returns_zero(capsys):
 
 def test_pending_commands_return_nonzero_and_do_not_pretend_to_run():
     parser = build_parser()
-    for name in ["live", "report"]:
+    for name in ["live"]:
         args = parser.parse_args([name])
         exit_code = args.func(args)
         assert exit_code != 0
@@ -285,3 +286,34 @@ def test_kill_switch_command_respects_history_limit(fake_kill_switch, capsys):
     assert exit_code == 0
     out = capsys.readouterr().out
     assert "max_portfolio_drawdown breached" not in out
+
+
+def test_report_command_writes_files_and_prints_their_paths(monkeypatch, tmp_path, capsys):
+    """Stubs run_report() itself so this test never touches the real
+    project database (src.reporting.report_engine.run_report has its
+    own thorough tests against an explicit in-memory db) -- this only
+    checks cmd_report's own glue: does it call run_report() and print
+    every path it returns."""
+    from src.reporting.report_engine import ReportResult
+
+    html_path = tmp_path / "reports" / "report.html"
+    csv_path = tmp_path / "reports" / "exports" / "experiments.csv"
+    json_path = tmp_path / "reports" / "exports" / "report.json"
+    for p in (html_path, csv_path, json_path):
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("x")
+
+    fake_result = ReportResult(data=None, html_path=html_path, csv_paths=[csv_path], json_path=json_path)
+    monkeypatch.setattr(main, "run_report", lambda: fake_result)
+    monkeypatch.setattr(main, "PROJECT_ROOT", tmp_path)
+
+    parser = build_parser()
+    args = parser.parse_args(["report"])
+    assert args.func is cmd_report
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "reports/report.html" in out
+    assert "reports/exports/experiments.csv" in out
+    assert "reports/exports/report.json" in out
+    assert "Open the HTML file directly" in out

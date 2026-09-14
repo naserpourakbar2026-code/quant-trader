@@ -46,6 +46,11 @@ class MonteCarloRun(Base):
     is_fragile: Mapped[bool] = mapped_column(Boolean)
 
     parameters_json: Mapped[str] = mapped_column(Text)
+    # Histogram (bin_edges/counts), not the raw per-simulation array --
+    # cheap enough to always persist, and it's what Phase 16's reporting
+    # engine renders as the "Monte Carlo Distribution" chart (CLAUDE.md
+    # Section 30) without needing to keep every simulation's return.
+    return_histogram_json: Mapped[str] = mapped_column(Text)
 
     code_version: Mapped[str] = mapped_column(String)
     python_version: Mapped[str] = mapped_column(String)

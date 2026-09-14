@@ -57,6 +57,11 @@ class MonteCarloResult:
     is_fragile: bool
     insufficient_data: bool = False
     parameters: dict = field(default_factory=dict)
+    # {"bin_edges": [...], "counts": [...]} over simulated total_return --
+    # a histogram, not the raw per-simulation array, cheap enough to
+    # always persist; Phase 16's reporting engine renders it as the
+    # "Monte Carlo Distribution" chart (CLAUDE.md Section 30).
+    return_histogram: dict = field(default_factory=dict)
 
     def to_text(self) -> str:
         lines = [
@@ -208,6 +213,9 @@ def run_monte_carlo(
         or probability_of_negative_return > cfg.fragility.max_probability_of_negative_return
     )
 
+    counts, bin_edges = np.histogram(sim["total_return"], bins=30)
+    return_histogram = {"bin_edges": bin_edges.tolist(), "counts": counts.tolist()}
+
     result = MonteCarloResult(
         run_id=str(uuid.uuid4()),
         strategy=strategy_family,
@@ -231,6 +239,7 @@ def run_monte_carlo(
         is_fragile=is_fragile,
         insufficient_data=n_trades_observed < cfg.min_trades,
         parameters=dict(strategy_params or {}),
+        return_histogram=return_histogram,
     )
 
     if persist:
@@ -257,6 +266,7 @@ def run_monte_carlo(
                 probability_of_negative_return=result.probability_of_negative_return,
                 is_fragile=result.is_fragile,
                 parameters=result.parameters,
+                return_histogram=result.return_histogram,
                 code_version=git_commit_hash(),
                 python_version=python_version(),
                 library_versions=library_versions(["pandas", "numpy", "vectorbt"]),

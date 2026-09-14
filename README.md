@@ -25,7 +25,7 @@ phase by phase (see Section 40 there); progress so far:
 | 13    | Generic broker API adapter                      | ✅ done |
 | 14    | Paper trading                                   | ✅ done |
 | 15    | Risk & kill switch                              | ✅ done |
-| 16    | Reporting                                       | pending |
+| 16    | Reporting                                       | ✅ done |
 | 17    | Full integration tests                          | pending |
 | 18    | Final robustness evaluation                     | pending |
 
@@ -645,6 +645,50 @@ durable yet: the hard kill switch.
   percentage mean different things account to account) across symbols
   correlated above a threshold at `max_correlated_exposure` of equity.
 
+## Reporting (Phase 16)
+
+CLAUDE.md Section 30, including its explicit user preference: the
+primary deliverable is one self-contained, pre-rendered HTML file —
+`python main.py report` generates it; opening it in a browser is enough
+to view every result, no server, no notebook, and no further command.
+
+- **`src/reporting/data.py`** gathers every persisted engine's results
+  (experiments, walk-forward windows, Monte Carlo runs, portfolio runs,
+  paper-trading sessions/trades, kill-switch events) into one place,
+  without any renderer needing to know how another engine's store
+  works. Nothing here is fabricated: a phase that hasn't been run
+  against real data yet contributes an empty list, and the report says
+  so explicitly rather than drawing an empty chart as if it meant
+  something.
+- **`src/reporting/charts.py`** renders exactly Section 30's chart list
+  — Equity Curve, Drawdown, Monthly Returns, Rolling Sharpe (of
+  R-multiple over a trailing trade window, not an annualized figure —
+  trades aren't evenly spaced in time, so "annualizing" one would be a
+  fabricated precision), Trade Distribution, Parameter Heatmap (from a
+  group of same-strategy/symbol/timeframe vectorbt runs varying in
+  exactly two parameters, e.g. `screen_parameter_grid()`'s output),
+  Walk-Forward Performance, Monte Carlo Distribution, and Strategy
+  Correlation (Phase 11's correlation matrix as a heatmap) — every one
+  as a matplotlib figure embedded straight into the HTML as a base64 PNG
+  `<img>`, never a JS charting library, so the page needs no network
+  fetch to render. Every function returns `None` instead of a chart when
+  there isn't enough real data to draw something meaningful.
+- Monte Carlo's distribution chart needed one small, honest addition to
+  Phase 10: `run_monte_carlo()` now also computes and persists a
+  histogram (bin edges + counts) of the simulated total-return array —
+  cheap to keep, unlike the full per-simulation array, and it's what
+  this chart actually renders.
+- **`src/reporting/exports.py`** writes one CSV per persisted table
+  under `reports/exports/` (column lists are derived from each
+  record's own dataclass fields via `dataclasses.fields()`, never
+  hand-typed — a hand-typed list actually drifted out of sync with the
+  Monte Carlo model during this phase's own development and was caught
+  by the first real smoke test) plus one consolidated `report.json`.
+  Nested fields (correlation matrices, metrics dicts) are JSON-encoded
+  within their CSV cell so they survive a flat format.
+- **`python main.py report`** (no arguments) runs all of the above
+  against the real project database and prints every file it wrote.
+
 ## CLI
 
 ```bash
@@ -668,7 +712,7 @@ python main.py paper-trade --strategy trend_following --symbol EURUSD --timefram
 python main.py kill-switch     # implemented, Phase 15 -- status + history
 python main.py kill-switch --reset "reviewed manually, resuming"
 python main.py live            # not yet implemented (requires LIVE_TRADING=true AND LIVE_CONFIRMATION=true)
-python main.py report          # Phase 16
+python main.py report          # implemented, Phase 16 -- writes reports/report.html + reports/exports/*
 ```
 
 Commands not yet implemented exit with a non-zero status and say which

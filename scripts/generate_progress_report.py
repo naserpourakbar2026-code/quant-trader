@@ -47,7 +47,7 @@ PHASES: list[Phase] = [
     Phase(13, "Generic REST/WebSocket broker adapter", "done"),
     Phase(14, "Paper trading", "done"),
     Phase(15, "Risk & kill switch", "done"),
-    Phase(16, "Reporting", "pending"),
+    Phase(16, "Reporting", "done"),
     Phase(17, "Full integration tests", "pending"),
     Phase(18, "Final robustness evaluation", "pending"),
 ]
