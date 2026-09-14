@@ -18,6 +18,8 @@ from src.montecarlo.run_store import list_runs as list_montecarlo_runs
 from src.portfolio.run_store import PortfolioRecord
 from src.portfolio.run_store import list_runs as list_portfolio_runs
 from src.risk.kill_switch import KillSwitch, KillSwitchEventRecord
+from src.robustness.run_store import RobustnessEvaluationRecord
+from src.robustness.run_store import list_evaluations as list_robustness_evaluations
 from src.walkforward.window_store import WindowRecord, list_windows
 
 
@@ -30,6 +32,7 @@ class ReportData:
     paper_sessions: list[PaperSessionRecord] = field(default_factory=list)
     paper_trades_by_run: dict[str, list[PaperTradeRecord]] = field(default_factory=dict)
     kill_switch_events: list[KillSwitchEventRecord] = field(default_factory=list)
+    robustness_evaluations: list[RobustnessEvaluationRecord] = field(default_factory=list)
 
 
 def gather_report_data(db: Database | None = None, *, max_paper_sessions: int = 5) -> ReportData:
@@ -49,4 +52,5 @@ def gather_report_data(db: Database | None = None, *, max_paper_sessions: int = 
         paper_sessions=paper_sessions_all,
         paper_trades_by_run={s.run_id: list_trades(s.run_id, db=db) for s in charted_sessions},
         kill_switch_events=KillSwitch(db=db).history(limit=50),
+        robustness_evaluations=list_robustness_evaluations(db=db),
     )

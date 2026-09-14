@@ -195,6 +195,46 @@ def _kill_switch_section(data: ReportData) -> str:
     </section>"""
 
 
+def _robustness_section(data: ReportData) -> str:
+    rows = [
+        {
+            "strategy": r.strategy, "symbol": r.symbol, "timeframe": r.timeframe, "status": r.status,
+            "score": _fmt(r.score, ".1f") if r.score is not None else "n/a",
+            "oos_pass_rate": _fmt_pct(r.oos_pass_rate), "p_ruin": _fmt_pct(r.probability_of_ruin),
+            "cost_fragile": r.is_cost_fragile, "trades": r.n_trades, "created_at": r.created_at,
+        }
+        for r in data.robustness_evaluations[:100]
+    ]
+
+    passing = sorted(
+        (r for r in data.robustness_evaluations if r.status == "PASS" and r.score is not None),
+        key=lambda r: r.score, reverse=True,
+    )[:3]
+    medals = ["🥇", "🥈", "🥉"]
+    if passing:
+        selection_html = "<ul>" + "".join(
+            f"<li>{medal} {html.escape(r.strategy)}/{html.escape(r.symbol)}/{html.escape(r.timeframe)} "
+            f"— score {r.score:.1f}/100</li>"
+            for medal, r in zip(medals, passing)
+        ) + "</ul>"
+    else:
+        selection_html = (
+            '<p class="muted">NO ROBUST STRATEGY FOUND — no evaluation has cleared the minimum robustness bar yet '
+            "(CLAUDE.md Section 32: an acceptable, expected outcome, not a failure to report).</p>"
+        )
+
+    return f"""
+    <section id="robustness">
+      <h2>Final Robustness Evaluation (Phase 18)</h2>
+      <p class="muted">Never the strategy with the highest backtest profit alone — the strongest evidenced
+      combination of profitability, risk-adjusted return, statistical reliability, out-of-sample performance,
+      parameter stability, and cost/randomization robustness (CLAUDE.md Section 44).</p>
+      {_table(rows, empty_message="No robustness evaluations yet — run `python main.py robustness`.")}
+      <h3>Strategy Selection</h3>
+      {selection_html}
+    </section>"""
+
+
 def render_html_report(data: ReportData) -> str:
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     sections = "\n".join([
@@ -204,10 +244,12 @@ def render_html_report(data: ReportData) -> str:
         _portfolio_section(data),
         _paper_trading_section(data),
         _kill_switch_section(data),
+        _robustness_section(data),
     ])
     nav_items = [
         ("experiments", "Screening"), ("walkforward", "Walk-Forward"), ("montecarlo", "Monte Carlo"),
         ("portfolio", "Portfolio"), ("paper-trading", "Paper Trading"), ("kill-switch", "Kill Switch"),
+        ("robustness", "Robustness"),
     ]
     nav = "".join(f'<a href="#{anchor}">{label}</a>' for anchor, label in nav_items)
 

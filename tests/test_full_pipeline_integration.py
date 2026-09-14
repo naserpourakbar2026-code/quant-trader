@@ -153,6 +153,13 @@ def test_full_cli_pipeline_end_to_end(isolated_default_db, real_raw_csv, clean_r
     assert code == 0
     assert "PAPER TRADING SESSION REPORT" in out
 
+    code, out = run(
+        "robustness", "--strategy", "trend_following", "--symbol", "EURUSD", "--timeframe", "H1",
+        "--trials", "3", "--simulations", "100",
+    )
+    assert code == 0
+    assert "FINAL ROBUSTNESS EVALUATION" in out
+
     code, out = run("kill-switch")
     assert code == 0
     assert "clear" in out  # this benign synthetic run shouldn't have tripped it
@@ -170,6 +177,7 @@ def test_full_cli_pipeline_end_to_end(isolated_default_db, real_raw_csv, clean_r
     assert "No Monte Carlo runs yet" not in html
     assert "No portfolio runs yet" not in html
     assert "No paper-trading sessions yet" not in html
+    assert "No robustness evaluations yet" not in html
     assert "trend_following" in html
     assert "EURUSD" in html
 
@@ -178,14 +186,16 @@ def test_full_cli_pipeline_end_to_end(isolated_default_db, real_raw_csv, clean_r
     from src.execution.trade_store import list_sessions
     from src.montecarlo.run_store import list_runs as list_mc_runs
     from src.portfolio.run_store import list_runs as list_portfolio_runs
+    from src.robustness.run_store import list_evaluations
     from src.walkforward.window_store import list_windows
 
     engines_seen = {e.engine for e in list_experiments()}
     assert {"vectorbt", "backtrader", "optuna"} <= engines_seen
-    assert len(list_windows()) >= 1
-    assert len(list_mc_runs()) == 1
+    assert len(list_windows()) >= 2  # one from `walk-forward`, one more from `robustness`'s internal walk-forward
+    assert len(list_mc_runs()) == 2  # one from `monte-carlo`, one more from `robustness`'s internal Monte Carlo
     assert len(list_portfolio_runs()) == 1
     assert len(list_sessions()) == 1
+    assert len(list_evaluations()) == 1
 
 
 def test_cli_pipeline_reports_missing_data_honestly_without_any_csv(isolated_default_db, clean_report_output, capsys):
@@ -208,6 +218,8 @@ def test_cli_pipeline_reports_missing_data_honestly_without_any_csv(isolated_def
     html = (PROJECT_ROOT / "reports" / "report.html").read_text()
     assert "No experiments yet" in html
     assert "No paper-trading sessions yet" in html
+    assert "No robustness evaluations yet" in html
+    assert "NO ROBUST STRATEGY FOUND" in html
 
 
 # --- broker adapter interface conformance ------------------------------------

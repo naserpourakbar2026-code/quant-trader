@@ -19,7 +19,7 @@ def test_write_csv_exports_creates_every_file_with_a_header_even_when_empty(tmp_
     names = {p.name for p in paths}
     assert names == {
         "experiments.csv", "walkforward_windows.csv", "montecarlo_runs.csv", "portfolio_runs.csv",
-        "paper_sessions.csv", "kill_switch_events.csv", "paper_trades.csv",
+        "paper_sessions.csv", "kill_switch_events.csv", "paper_trades.csv", "robustness_evaluations.csv",
     }
     for path in paths:
         with path.open() as f:

@@ -50,6 +50,26 @@ def test_run_report_html_mentions_no_data_yet_when_nothing_persisted(db, tmp_pat
     assert "No experiments yet" in html
     assert "No Monte Carlo runs yet" in html
     assert "No paper-trading sessions yet" in html
+    assert "No robustness evaluations yet" in html
+    assert "NO ROBUST STRATEGY FOUND" in html
+
+
+def test_run_report_shows_strategy_selection_for_a_passing_robustness_evaluation(db, tmp_path):
+    from src.core.config import load_strategies
+    from src.robustness.evaluation import run_robustness_evaluation
+
+    raw = _synthetic_raw_candles()
+    space = load_strategies().strategies["trend_following"].optimization_space
+    run_robustness_evaluation("trend_following", "EURUSD", "H1", raw, space, n_trials=3, mc_simulations=150, db=db)
+
+    result = run_report(db=db, output_dir=tmp_path)
+    html = result.html_path.read_text()
+    assert len(result.data.robustness_evaluations) == 1
+    if result.data.robustness_evaluations[0].status == "PASS":
+        assert "🥇" in html
+        assert "NO ROBUST STRATEGY FOUND" not in html
+    else:
+        assert "NO ROBUST STRATEGY FOUND" in html
 
 
 def test_run_report_reflects_real_persisted_results(db, tmp_path):

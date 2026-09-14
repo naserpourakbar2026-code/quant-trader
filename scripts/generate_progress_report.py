@@ -49,7 +49,7 @@ PHASES: list[Phase] = [
     Phase(15, "Risk & kill switch", "done"),
     Phase(16, "Reporting", "done"),
     Phase(17, "Full integration tests", "done"),
-    Phase(18, "Final robustness evaluation", "pending"),
+    Phase(18, "Final robustness evaluation", "done"),
 ]
 
 

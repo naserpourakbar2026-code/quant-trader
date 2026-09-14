@@ -27,7 +27,7 @@ phase by phase (see Section 40 there); progress so far:
 | 15    | Risk & kill switch                              | ✅ done |
 | 16    | Reporting                                       | ✅ done |
 | 17    | Full integration tests                          | ✅ done |
-| 18    | Final robustness evaluation                     | pending |
+| 18    | Final robustness evaluation                     | ✅ done |
 
 ## Requirements
 
@@ -95,8 +95,12 @@ And `kill_switch_events` (`src/risk/models.py`, Phase 15) — an
 append-only audit log (never a mutable row) of every kill-switch trip
 and reset, which is what makes the kill switch durable across sessions
 and process restarts (Section 7's "hard" kill switch), not a fresh
-in-memory flag every run forgets. More tables arrive with the phases
-that need them.
+in-memory flag every run forgets. And `robustness_evaluations`
+(`src/robustness/models.py`, Phase 18) — the final 0-100 score, status
+(`PASS`/`FAIL`/`COST FRAGILE`/`OVERFIT`/`INSUFFICIENT DATA`/
+`NOT ROBUST`), and the summary numbers behind it for each evaluated
+combination — the table the Phase 16 report's final results table and
+🥇🥈🥉 selection are built from.
 
 ## Data ingestion (Phase 2)
 
@@ -689,6 +693,73 @@ to view every result, no server, no notebook, and no further command.
 - **`python main.py report`** (no arguments) runs all of the above
   against the real project database and prints every file it wrote.
 
+## Final robustness evaluation (Phase 18)
+
+CLAUDE.md Sections 18, 31-36 and 43-44 — the last phase, deliberately a
+thin orchestrator: every heavy-lifting step is a previous phase's own
+already-tested engine, run once more and combined, never reimplemented.
+`python main.py robustness --strategy --symbol --timeframe` runs:
+
+1. **Walk-forward (Phase 9)** — the OOS discipline and parameter-
+   stability score everything else is evaluated in light of.
+2. **Monte Carlo (Phase 10)** on the frozen parameters from the most
+   recent window.
+3. **`src/robustness/cost_stress.py`** — the Transaction Cost Stress
+   Test (Section 34): re-runs the Backtrader engine (the one that
+   actually folds the data's own `spread` column into cost) with the
+   spread scaled by `robustness.cost_stress_spread_multipliers`
+   (1.0/1.5/2.0/3.0x) across all three named scenarios. `is_cost_fragile`
+   fires only when a *small* increase (the smallest configured
+   multiplier above 1.0x, not the most extreme one) already erases
+   profitability — Section 34's own wording. If the source data has no
+   real `spread` column, NaN × any multiplier is still NaN: the test
+   correctly becomes a no-op rather than fabricating a spread that was
+   never measured.
+4. **`src/robustness/capital_simulation.py`** — the Capital Simulation
+   (Section 33): a real paper-trading session (Phase 14) on the frozen
+   parameters supplies actual closed trades, converted to R-multiples
+   (`pnl / risk_amount`) — risk-level-independent by construction, since
+   every position-sizing formula in this codebase already assumes
+   `pnl/equity = r_multiple * risk_pct`. Replaying that same R-multiple
+   sequence at each of `settings.risk.allowed_risk_levels` (never a new
+   hard-coded list) gives final equity, max drawdown in EUR, max losing
+   streak, probability of ruin (reusing Phase 10's own bootstrap), and
+   margin utilization — all without assuming historical returns repeat
+   (Section 33's own words).
+5. **`src/robustness/score.py`** — the Final Robustness Score (Section
+   31): a 0-100 score from 8 weighted sub-factors (`robustness.weights`
+   in `config/settings.yaml`, validated to sum to 1.0 so none can
+   silently dominate), each normalized against a config value that
+   *already exists elsewhere for the same purpose* — Optuna's own
+   profit-factor cap, the risk engine's own drawdown kill-switch
+   threshold, Monte Carlo's own fragility cutoff — rather than a second
+   set of thresholds that could quietly drift from the first. Status is
+   one of `PASS / FAIL / COST FRAGILE / OVERFIT / INSUFFICIENT DATA /
+   NOT ROBUST` (CLAUDE.md Section 43's exact vocabulary); `INSUFFICIENT
+   DATA` fires before a score is even computed if walk-forward or Monte
+   Carlo results are missing, or too few trades were observed — never a
+   partial, falsely-confident number.
+6. **`src/robustness/selection.py`** — Strategy Selection (Section 32):
+   ranks every `PASS`-status evaluation by score and reports up to three
+   🥇🥈🥉 medalists, or **"NO ROBUST STRATEGY FOUND"** — Section 32's own
+   words for "an acceptable, expected outcome, not a failure to report."
+
+Every evaluation persists to `robustness_evaluations` and the Phase 16
+HTML report gains its own section rendering exactly this — the "final
+results table" CLAUDE.md Section 43 asks for — plus the medal selection,
+built from whatever has genuinely been evaluated so far, never
+fabricated to look more complete.
+
+A note on Section 35's randomization tests: "random trade order" and
+"increased spread/slippage" are exactly what Monte Carlo's bootstrap
+(`execution_noise_std`) and the cost stress test above already do;
+"parameter perturbation"/"slightly altered indicator periods" is
+exactly Phase 8's `assess_parameter_stability()`, whose score
+walk-forward already carries into this evaluation. "Randomized entry
+delay" has no mechanism in this codebase yet — vectorbt's engine has no
+delay parameter to perturb — and is named here rather than silently
+skipped: a real gap, not an oversight.
+
 ## CLI
 
 ```bash
@@ -711,6 +782,7 @@ python main.py paper-trade --strategy trend_following --symbol EURUSD --timefram
 python main.py paper-trade --strategy trend_following --symbol EURUSD --timeframe H1 --capital 5000 --scenario stress
 python main.py kill-switch     # implemented, Phase 15 -- status + history
 python main.py kill-switch --reset "reviewed manually, resuming"
+python main.py robustness --strategy trend_following --symbol EURUSD --timeframe H1  # implemented, Phase 18
 python main.py live            # not yet implemented (requires LIVE_TRADING=true AND LIVE_CONFIRMATION=true)
 python main.py report          # implemented, Phase 16 -- writes reports/report.html + reports/exports/*
 ```
@@ -764,7 +836,7 @@ quant_trader/
 ├── src/
 │   ├── core/          # config loading, logging
 │   ├── data/ features/ strategies/ risk/ backtest/ optimization/
-│   ├── walkforward/ montecarlo/ portfolio/ execution/ brokers/ reporting/
+│   ├── walkforward/ montecarlo/ portfolio/ execution/ brokers/ reporting/ robustness/
 ├── tests/
 ├── notebooks/ reports/ logs/ scripts/
 ├── main.py

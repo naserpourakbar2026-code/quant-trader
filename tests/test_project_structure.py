@@ -19,6 +19,7 @@ EXPECTED_DIRS = [
     "src/execution",
     "src/brokers",
     "src/reporting",
+    "src/robustness",
     "src/core",
     "tests",
     "notebooks",

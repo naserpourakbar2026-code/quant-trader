@@ -129,6 +129,25 @@ portfolio:
   min_trades: 10
   allocation_methods: [equal_weight, inverse_volatility]
 
+robustness:
+  # CLAUDE.md Sections 31-32: the Final Robustness Score (0-100) and the
+  # minimum bar to be selected as one of the top-3 "robust" candidates.
+  # Weights are a stated, adjustable default (Section 31: "no single
+  # metric should dominate") -- not a claim of optimality, and they must
+  # sum to 1.0 (validated in src/core/config.py).
+  min_pass_score: 60.0
+  sharpe_reference: 2.0             # a Sharpe at/above this scores 100 on that sub-factor
+  cost_stress_spread_multipliers: [1.0, 1.5, 2.0, 3.0]   # CLAUDE.md Section 34
+  weights:
+    oos_performance: 0.20
+    drawdown: 0.20
+    profit_factor: 0.15
+    sharpe_sortino: 0.15
+    parameter_stability: 0.10
+    monte_carlo_robustness: 0.10
+    cost_sensitivity: 0.05
+    trade_count_reliability: 0.05
+
 live_trading: false               # never true by default; see .env LIVE_TRADING/LIVE_CONFIRMATION
 
 paths:

@@ -22,6 +22,7 @@ from src.montecarlo.mc_engine import run_monte_carlo
 from src.optimization.optuna_engine import assess_parameter_stability, run_optimization
 from src.portfolio.portfolio_engine import run_portfolio_analysis
 from src.reporting.report_engine import run_report
+from src.robustness.evaluation import run_robustness_evaluation
 from src.risk.kill_switch import KillSwitch
 from src.walkforward.wfa_engine import run_walk_forward
 
@@ -429,6 +430,41 @@ def cmd_report(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_robustness(args: argparse.Namespace) -> int:
+    """Final robustness evaluation (Phase 18, CLAUDE.md Sections 18,
+    31-36, 43-44): walk-forward + Monte Carlo + a transaction-cost
+    stress test + a capital simulation across every configured risk
+    level, combined into one 0-100 score and a PASS/FAIL/COST FRAGILE/
+    OVERFIT/INSUFFICIENT DATA/NOT ROBUST verdict. Never the strategy
+    with the highest backtest profit alone — the strongest evidenced
+    combination of profitability, risk-adjusted return, statistical
+    reliability, out-of-sample performance, parameter stability, and
+    cost/randomization robustness. Deliberately scoped to one explicit
+    combination — it runs a full walk-forward search internally, so it
+    is at least as expensive as `walk-forward` alone."""
+    strategies_cfg = load_strategies()
+    definition = strategies_cfg.strategies.get(args.strategy)
+    if definition is None:
+        print(f"Unknown strategy {args.strategy!r}; expected one of {sorted(strategies_cfg.strategies)}", file=sys.stderr)
+        return 1
+    if not definition.optimization_space:
+        print(f"Strategy {args.strategy!r} has no optimization_space configured in strategies.yaml.", file=sys.stderr)
+        return 1
+
+    try:
+        raw_df = load_csv(args.symbol, args.timeframe)
+    except FileNotFoundError as exc:
+        print(str(exc))
+        return 0
+
+    result = run_robustness_evaluation(
+        args.strategy, args.symbol, args.timeframe, raw_df, definition.optimization_space,
+        n_trials=args.trials, mc_simulations=args.simulations, scenario=args.scenario, seed=args.seed,
+    )
+    print(result.to_text())
+    return 0
+
+
 def _not_implemented(name: str, phase: int) -> int:
     logger = get_system_logger()
     message = (
@@ -553,6 +589,18 @@ def build_parser() -> argparse.ArgumentParser:
         "report", help="Generate the self-contained HTML report + CSV/JSON exports (Phase 16)"
     )
     report_parser.set_defaults(func=cmd_report)
+
+    robustness_parser = subparsers.add_parser(
+        "robustness", help="Final robustness evaluation: score + PASS/FAIL/... verdict (Phase 18)"
+    )
+    robustness_parser.add_argument("--strategy", required=True, help="Strategy family (see config/strategies.yaml)")
+    robustness_parser.add_argument("--symbol", required=True, help="Symbol to evaluate")
+    robustness_parser.add_argument("--timeframe", required=True, help="Timeframe to evaluate")
+    robustness_parser.add_argument("--trials", type=int, help="Optuna trials per walk-forward window (default: optimization.n_trials)")
+    robustness_parser.add_argument("--simulations", type=int, help="Monte Carlo simulations (default: montecarlo.n_simulations)")
+    robustness_parser.add_argument("--scenario", help="optimistic|realistic|stress (default: execution.default_scenario)")
+    robustness_parser.add_argument("--seed", type=int, help="Random seed override")
+    robustness_parser.set_defaults(func=cmd_robustness)
 
     for name, (_implemented, phase) in COMMAND_PHASES.items():
         sub = subparsers.add_parser(name, help=f"(pending — Phase {phase})")

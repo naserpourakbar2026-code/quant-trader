@@ -17,6 +17,7 @@ from src.montecarlo.run_store import MonteCarloRecord
 from src.portfolio.run_store import PortfolioRecord
 from src.reporting.data import ReportData
 from src.risk.kill_switch import KillSwitchEventRecord
+from src.robustness.run_store import RobustnessEvaluationRecord
 from src.walkforward.window_store import WindowRecord
 
 
@@ -60,6 +61,7 @@ _EXPORT_TABLES: dict[str, tuple[str, type]] = {
     "portfolio_runs": ("portfolio_runs.csv", PortfolioRecord),
     "paper_sessions": ("paper_sessions.csv", PaperSessionRecord),
     "kill_switch_events": ("kill_switch_events.csv", KillSwitchEventRecord),
+    "robustness_evaluations": ("robustness_evaluations.csv", RobustnessEvaluationRecord),
 }
 
 
@@ -97,6 +99,7 @@ def write_json_export(data: ReportData, output_path: Path) -> Path:
             run_id: [dataclasses.asdict(t) for t in trades] for run_id, trades in data.paper_trades_by_run.items()
         },
         "kill_switch_events": [dataclasses.asdict(r) for r in data.kill_switch_events],
+        "robustness_evaluations": [dataclasses.asdict(r) for r in data.robustness_evaluations],
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(payload, indent=2, default=_default), encoding="utf-8")

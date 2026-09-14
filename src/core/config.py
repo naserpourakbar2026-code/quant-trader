@@ -199,6 +199,52 @@ class MonteCarloConfig(BaseModel):
     fragility: MonteCarloFragilityConfig
 
 
+class RobustnessWeights(BaseModel):
+    """CLAUDE.md Section 31's weighting table for the Final Robustness
+    Score — a stated, adjustable default (like every other weighting
+    table in this codebase), validated to sum to 1.0 so no single
+    factor can silently dominate by an arithmetic accident."""
+
+    oos_performance: float = Field(ge=0, le=1)
+    drawdown: float = Field(ge=0, le=1)
+    profit_factor: float = Field(ge=0, le=1)
+    sharpe_sortino: float = Field(ge=0, le=1)
+    parameter_stability: float = Field(ge=0, le=1)
+    monte_carlo_robustness: float = Field(ge=0, le=1)
+    cost_sensitivity: float = Field(ge=0, le=1)
+    trade_count_reliability: float = Field(ge=0, le=1)
+
+    @model_validator(mode="after")
+    def weights_sum_to_one(self) -> "RobustnessWeights":
+        total = (
+            self.oos_performance + self.drawdown + self.profit_factor + self.sharpe_sortino
+            + self.parameter_stability + self.monte_carlo_robustness + self.cost_sensitivity
+            + self.trade_count_reliability
+        )
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError(f"robustness.weights must sum to 1.0, got {total}")
+        return self
+
+
+class RobustnessConfig(BaseModel):
+    """CLAUDE.md Sections 31-32: the Final Robustness Score and the
+    minimum bar a strategy must clear to be selected as one of the
+    top-3 "robust" candidates — never the strategy with the highest
+    backtest profit alone (Section 44)."""
+
+    min_pass_score: float = Field(ge=0, le=100)
+    sharpe_reference: float = Field(gt=0)  # a Sharpe at/above this scores 100 on that sub-factor
+    cost_stress_spread_multipliers: list[float]
+    weights: RobustnessWeights
+
+    @field_validator("cost_stress_spread_multipliers")
+    @classmethod
+    def multipliers_include_baseline(cls, v: list[float]) -> list[float]:
+        if not v or min(v) < 1.0:
+            raise ValueError("cost_stress_spread_multipliers must be non-empty and include a >=1.0 baseline")
+        return sorted(v)
+
+
 class PortfolioConfig(BaseModel):
     """CLAUDE.md Section 20: don't assume one strategy is optimal — screen
     many strategy x symbol x timeframe combinations, but only carry the
@@ -243,6 +289,7 @@ class AppConfig(BaseModel):
     optimization: OptimizationConfig
     montecarlo: MonteCarloConfig
     portfolio: PortfolioConfig
+    robustness: RobustnessConfig
     live_trading: bool
     paths: PathsConfig
     logging: LoggingConfig

@@ -12,6 +12,7 @@ from main import (
     cmd_paper_trade,
     cmd_portfolio,
     cmd_report,
+    cmd_robustness,
     cmd_validate_data,
     cmd_walk_forward,
 )
@@ -317,3 +318,32 @@ def test_report_command_writes_files_and_prints_their_paths(monkeypatch, tmp_pat
     assert "reports/exports/experiments.csv" in out
     assert "reports/exports/report.json" in out
     assert "Open the HTML file directly" in out
+
+
+def test_robustness_command_reports_missing_when_no_raw_file(capsys):
+    parser = build_parser()
+    args = parser.parse_args(
+        ["robustness", "--strategy", "trend_following", "--symbol", "EURUSD", "--timeframe", "H1"]
+    )
+    assert args.func is cmd_robustness
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "No raw CSV found" in out
+
+
+def test_robustness_command_rejects_unknown_strategy(capsys):
+    parser = build_parser()
+    args = parser.parse_args(
+        ["robustness", "--strategy", "not_a_real_strategy", "--symbol", "EURUSD", "--timeframe", "H1"]
+    )
+    exit_code = args.func(args)
+    assert exit_code == 1
+    err = capsys.readouterr().err
+    assert "Unknown strategy" in err
+
+
+def test_robustness_command_requires_strategy_symbol_timeframe():
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["robustness", "--strategy", "trend_following"])
