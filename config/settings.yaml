@@ -119,6 +119,16 @@ montecarlo:
     max_probability_of_ruin: 0.05
     max_probability_of_negative_return: 0.5
 
+portfolio:
+  # CLAUDE.md Section 20: analyze strategy x symbol x timeframe
+  # combinations, but only carry the statistically-usable, best-ranked
+  # survivors into the correlation/allocation step (Section 12's "avoid
+  # wasting compute" applies here too -- a huge correlation matrix isn't
+  # more informative, just noisier).
+  top_n: 10
+  min_trades: 10
+  allocation_methods: [equal_weight, inverse_volatility]
+
 live_trading: false               # never true by default; see .env LIVE_TRADING/LIVE_CONFIRMATION
 
 paths:

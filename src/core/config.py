@@ -199,6 +199,26 @@ class MonteCarloConfig(BaseModel):
     fragility: MonteCarloFragilityConfig
 
 
+class PortfolioConfig(BaseModel):
+    """CLAUDE.md Section 20: don't assume one strategy is optimal — screen
+    many strategy x symbol x timeframe combinations, but only carry the
+    statistically-usable survivors into the (deliberately basic)
+    correlation/allocation step."""
+
+    top_n: int = Field(gt=0)  # cap on how many screened combinations enter the portfolio step
+    min_trades: int = Field(gt=0)  # combinations with fewer trades than this are excluded as unreliable
+    allocation_methods: list[str]
+
+    @field_validator("allocation_methods")
+    @classmethod
+    def allocation_methods_supported(cls, v: list[str]) -> list[str]:
+        allowed = {"equal_weight", "inverse_volatility"}
+        unknown = [m for m in v if m not in allowed]
+        if unknown:
+            raise ValueError(f"portfolio.allocation_methods has unsupported entries {unknown}; expected one of {allowed}")
+        return v
+
+
 class PathsConfig(BaseModel):
     data_raw: str
     data_processed: str
@@ -222,6 +242,7 @@ class AppConfig(BaseModel):
     features: FeaturesConfig
     optimization: OptimizationConfig
     montecarlo: MonteCarloConfig
+    portfolio: PortfolioConfig
     live_trading: bool
     paths: PathsConfig
     logging: LoggingConfig

@@ -19,11 +19,11 @@ from src.data.ingestion import run_download
 from src.data.validation import run_validation
 from src.montecarlo.mc_engine import run_monte_carlo
 from src.optimization.optuna_engine import assess_parameter_stability, run_optimization
+from src.portfolio.portfolio_engine import run_portfolio_analysis
 from src.walkforward.wfa_engine import run_walk_forward
 
 # command -> (implemented, scheduled phase)
 COMMAND_PHASES: dict[str, tuple[bool, int]] = {
-    "portfolio": (False, 11),
     "paper-trade": (False, 14),
     "live": (False, 14),
     "report": (False, 16),
@@ -308,6 +308,60 @@ def cmd_monte_carlo(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_portfolio(args: argparse.Namespace) -> int:
+    """Screen every enabled strategy x symbol x timeframe combination
+    (optionally filtered), keep the statistically-usable top survivors,
+    and test whether combining them (equal-weight / inverse-volatility)
+    improves Sharpe, Sortino, drawdown, and return consistency versus the
+    single best combination alone (Phase 11, CLAUDE.md Section 20)."""
+    strategies_cfg = load_strategies()
+    settings = load_settings()
+    scenario = args.scenario or settings.execution.default_scenario
+
+    combos: list[tuple[str, str, str]] = []
+    for name, definition in strategies_cfg.strategies.items():
+        if not definition.enabled:
+            continue
+        if args.strategy and name != args.strategy:
+            continue
+        symbols = [args.symbol] if args.symbol else definition.symbols
+        timeframes = [args.timeframe] if args.timeframe else definition.timeframes
+        combos.extend((name, symbol, timeframe) for symbol in symbols for timeframe in timeframes)
+
+    if not combos:
+        print("No enabled strategy/symbol/timeframe combination matched.")
+        return 0
+
+    components_data = []
+    missing = []
+    for family, symbol, timeframe in combos:
+        try:
+            components_data.append((family, symbol, timeframe, load_csv(symbol, timeframe)))
+        except FileNotFoundError as exc:
+            missing.append((family, symbol, timeframe, str(exc)))
+
+    if missing:
+        print(f"Skipped {len(missing)}/{len(combos)} combination(s) with no raw data:")
+        for family, symbol, timeframe, message in missing:
+            print(f"  {family:24s} {symbol:8s} {timeframe:4s}  {message}")
+
+    if not components_data:
+        print("No raw data available for any matched combination.")
+        return 0
+
+    try:
+        result = run_portfolio_analysis(
+            components_data, scenario=scenario, top_n=args.top_n, min_trades=args.min_trades,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return 0
+
+    print(f"\nScreened {len(components_data)} combination(s).")
+    print(result.to_text())
+    return 0
+
+
 def _not_implemented(name: str, phase: int) -> int:
     logger = get_system_logger()
     message = (
@@ -391,6 +445,23 @@ def build_parser() -> argparse.ArgumentParser:
     mc_parser.add_argument("--scenario", help="optimistic|realistic|stress (default: execution.default_scenario)")
     mc_parser.add_argument("--seed", type=int, help="Random seed override (default: montecarlo.random_seed)")
     mc_parser.set_defaults(func=cmd_monte_carlo)
+
+    portfolio_parser = subparsers.add_parser(
+        "portfolio", help="Screen combinations + test basic allocation across them (Phase 11)"
+    )
+    portfolio_parser.add_argument("--strategy", help="Limit to one strategy family (default: all enabled)")
+    portfolio_parser.add_argument("--symbol", help="Limit to one symbol (default: each strategy's configured list)")
+    portfolio_parser.add_argument(
+        "--timeframe", help="Limit to one timeframe (default: each strategy's configured list)"
+    )
+    portfolio_parser.add_argument("--scenario", help="optimistic|realistic|stress (default: execution.default_scenario)")
+    portfolio_parser.add_argument(
+        "--top-n", type=int, dest="top_n", help="Max combinations entering the allocation step (default: portfolio.top_n)"
+    )
+    portfolio_parser.add_argument(
+        "--min-trades", type=int, dest="min_trades", help="Exclude combinations with fewer trades (default: portfolio.min_trades)"
+    )
+    portfolio_parser.set_defaults(func=cmd_portfolio)
 
     for name, (_implemented, phase) in COMMAND_PHASES.items():
         sub = subparsers.add_parser(name, help=f"(pending — Phase {phase})")

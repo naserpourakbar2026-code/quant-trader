@@ -20,7 +20,7 @@ phase by phase (see Section 40 there); progress so far:
 | 8     | Optuna optimization                             | ✅ done |
 | 9     | Walk-forward                                    | ✅ done |
 | 10    | Monte Carlo                                     | ✅ done |
-| 11    | Portfolio engine                                | pending |
+| 11    | Portfolio engine                                | ✅ done |
 | 12    | MT5 adapter (code + mocked tests, Windows-only) | pending |
 | 13    | Generic broker API adapter                      | pending |
 | 14    | Paper trading                                   | pending |
@@ -80,8 +80,11 @@ validation run, distinguished by an `engine` column ("vectorbt" |
 verdict) than a single backtest `Experiment`. And `montecarlo_runs`
 (`src/montecarlo/models.py`) — one row per Monte Carlo run (Phase 10): the
 observed trade count it resampled from, simulation count/seed, and the
-resulting outcome-distribution summary. More tables arrive with the
-phases that need them.
+resulting outcome-distribution summary. And `portfolio_runs`
+(`src/portfolio/models.py`) — one row per portfolio analysis run (Phase
+11): the screened components, their pairwise correlation, and each
+allocation method's weights/metrics/verdict versus the best single
+component. More tables arrive with the phases that need them.
 
 ## Data ingestion (Phase 2)
 
@@ -375,6 +378,50 @@ single number.
   chosen elsewhere — it does not search for one) and prints the full
   report.
 
+## Portfolio engine (Phase 11)
+
+`src/portfolio/portfolio_engine.py` — CLAUDE.md Section 20: "don't assume
+one strategy is optimal." Screens strategy x symbol x timeframe
+combinations (the same vectorbt screening engine as everywhere else),
+then tests whether combining several of them actually helps versus just
+running the single best one.
+
+- Ranks every screened combination by Sharpe and keeps only the top
+  `portfolio.top_n` combinations with at least `portfolio.min_trades`
+  trades (reusing Phase 6's `filter_top_candidates()` — the same "avoid
+  wasting compute on obviously poor regions" rationale, applied to
+  correlation/allocation instead of parameter sweeps).
+- Combinations on **different timeframes are never combined** — a bar of
+  H1 and a bar of H4 are not the same unit of time. Survivors are grouped
+  by timeframe and only the single largest group enters the
+  correlation/allocation step.
+- `get_bar_returns()` (a new function on `src.backtest.vectorbt_engine`,
+  sharing its Portfolio construction with `run_screening()`) gives each
+  survivor's per-bar return series; `align_returns()` outer-joins them on
+  timestamp (missing bars filled with 0.0 — a stated simplification, not
+  a certified risk model) and `correlation_matrix()` reports their
+  pairwise correlation.
+- Two **basic** allocation schemes (Section 20's own wording — this is
+  not a mean-variance/Markowitz solver): `equal_weight` and
+  `inverse_volatility` (lower-volatility components get more weight;
+  falls back to equal weight if any component's volatility is exactly
+  zero, where inverse-vol is undefined).
+- `evaluate_returns()` computes Sharpe/Sortino/max-drawdown/return/
+  positive-month-ratio directly from the combined return series
+  (annualized using a factor inferred from the *actual* median bar
+  spacing in the data — never a hard-coded per-timeframe constant), using
+  the **same sign convention as vectorbt's own `max_drawdown()`** (zero
+  or negative; less negative is a smaller, better drawdown) so
+  `compare_to_best_component()` can compare portfolio vs. single-best
+  metrics directly — exactly Section 20's ask: "test whether
+  diversification improves Sharpe, Sortino, drawdown, and return
+  consistency."
+- `python main.py portfolio` (optionally filtered by `--strategy
+  --symbol --timeframe`, `--top-n`, `--min-trades`) screens every enabled
+  combination that matches, reports which had no raw data, and prints
+  each survivor's individual metrics, the correlation matrix, and each
+  allocation method's weights/metrics/improved-vs-not verdict.
+
 ## CLI
 
 ```bash
@@ -391,7 +438,8 @@ python main.py walk-forward --strategy trend_following --symbol EURUSD --timefra
 python main.py walk-forward --strategy trend_following --symbol EURUSD --timeframe H1 --window-bars 600 --step-bars 300
 python main.py monte-carlo --strategy trend_following --symbol EURUSD --timeframe H1  # implemented, Phase 10
 python main.py monte-carlo --strategy trend_following --symbol EURUSD --timeframe H1 --simulations 5000 --scenario stress
-python main.py portfolio       # Phase 11
+python main.py portfolio        # implemented, Phase 11 -- all enabled combinations
+python main.py portfolio --timeframe H1 --top-n 5 --min-trades 20
 python main.py paper-trade     # Phase 14
 python main.py live            # Phase 14 (requires LIVE_TRADING=true AND LIVE_CONFIRMATION=true)
 python main.py report          # Phase 16

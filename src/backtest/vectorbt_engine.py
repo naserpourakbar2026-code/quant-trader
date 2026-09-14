@@ -14,7 +14,9 @@ with a unique ID and full reproducibility metadata (Section 36).
 
 get_trade_returns() exposes the same run's per-trade returns without
 persisting anything — the raw material Phase 10's Monte Carlo engine
-(src.montecarlo.mc_engine) resamples from.
+(src.montecarlo.mc_engine) resamples from. get_bar_returns() exposes the
+same run's per-bar return series — the raw material Phase 11's portfolio
+engine (src.portfolio.portfolio_engine) aligns across combinations.
 """
 from __future__ import annotations
 
@@ -240,6 +242,34 @@ def get_trade_returns(
         warmup_df=warmup_df,
     )
     return pf.trades.returns.values
+
+
+def get_bar_returns(
+    strategy_family: str,
+    raw_df: pd.DataFrame,
+    *,
+    strategy_params: dict | None = None,
+    feature_params: FeatureParams | None = None,
+    scenario: str | None = None,
+    initial_capital: float | None = None,
+    warmup_df: pd.DataFrame | None = None,
+) -> pd.Series:
+    """Per-bar (not per-trade) portfolio returns, indexed by timestamp,
+    from the same vectorbt Portfolio run_screening() would build — the
+    time series Phase 11's portfolio engine (src.portfolio.portfolio_engine)
+    aligns across strategy/symbol/timeframe combinations to compute
+    correlation and combined-portfolio metrics. Not persisted on its own.
+    """
+    pf, _indexed, _scenario, _strat = _build_portfolio(
+        strategy_family,
+        raw_df,
+        strategy_params=strategy_params,
+        feature_params=feature_params,
+        scenario=scenario,
+        initial_capital=initial_capital,
+        warmup_df=warmup_df,
+    )
+    return pf.returns()
 
 
 def screen_parameter_grid(

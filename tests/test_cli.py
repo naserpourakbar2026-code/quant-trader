@@ -7,6 +7,7 @@ from main import (
     cmd_info,
     cmd_monte_carlo,
     cmd_optimize,
+    cmd_portfolio,
     cmd_validate_data,
     cmd_walk_forward,
 )
@@ -156,3 +157,27 @@ def test_monte_carlo_command_requires_strategy_symbol_timeframe():
     parser = build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["monte-carlo", "--strategy", "trend_following"])
+
+
+def test_portfolio_command_reports_missing_when_no_raw_file(capsys):
+    """No CSV placed yet under data/raw for this symbol/timeframe -> the
+    combination is skipped (reported, not fabricated), exit code 0."""
+    parser = build_parser()
+    args = parser.parse_args(
+        ["portfolio", "--strategy", "trend_following", "--symbol", "EURUSD", "--timeframe", "H1"]
+    )
+    assert args.func is cmd_portfolio
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "Skipped" in out
+    assert "No raw data available" in out
+
+
+def test_portfolio_command_no_matching_strategy_reports_and_exits_zero(capsys):
+    parser = build_parser()
+    args = parser.parse_args(["portfolio", "--strategy", "not_a_real_strategy"])
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "No enabled strategy" in out
