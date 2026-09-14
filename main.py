@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime
 
 from src.core.config import is_live_trading_enabled, load_brokers, load_settings, load_strategies
 from src.core.logging import configure_logging, get_system_logger
+from src.data.ingestion import run_download
 
 # command -> (implemented, scheduled phase)
 COMMAND_PHASES: dict[str, tuple[bool, int]] = {
-    "download-data": (False, 2),
     "validate-data": (False, 3),
     "backtest": (False, 7),
     "optimize": (False, 8),
@@ -46,6 +47,39 @@ def cmd_info(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_download_data(args: argparse.Namespace) -> int:
+    """Ingest historical data (Phase 2): CSV files from data/raw/, or MT5
+    (Windows-only, requires --start/--end and a running terminal).
+    """
+    symbols = [args.symbol] if args.symbol else None
+    timeframes = [args.timeframe] if args.timeframe else None
+    start = datetime.fromisoformat(args.start) if args.start else None
+    end = datetime.fromisoformat(args.end) if args.end else None
+
+    results = run_download(symbols=symbols, timeframes=timeframes, start=start, end=end)
+    ok = [r for r in results if r.status == "ok"]
+    missing = [r for r in results if r.status == "missing"]
+    errors = [r for r in results if r.status == "error"]
+
+    print(f"Ingested {len(ok)}/{len(results)} symbol/timeframe combinations.")
+    for r in ok:
+        print(f"  OK      {r.symbol:8s} {r.timeframe:4s}  {r.rows} rows")
+    for r in missing:
+        print(f"  MISSING {r.symbol:8s} {r.timeframe:4s}  {r.message}")
+    for r in errors:
+        print(f"  ERROR   {r.symbol:8s} {r.timeframe:4s}  {r.message}")
+
+    if missing and not ok and not errors:
+        settings = load_settings()
+        print(
+            f"\nNo raw data found yet. For source={settings.data.source!r}, place CSV files under "
+            f"{settings.paths.data_raw}/<SYMBOL>_<TIMEFRAME>.csv with at least "
+            "timestamp,open,high,low,close,volume columns."
+        )
+
+    return 0 if not errors else 1
+
+
 def _not_implemented(name: str, phase: int) -> int:
     logger = get_system_logger()
     message = (
@@ -62,6 +96,15 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("info", help="Validate config and print environment summary").set_defaults(func=cmd_info)
+
+    download_parser = subparsers.add_parser(
+        "download-data", help="Ingest historical data into data/processed/ (Phase 2)"
+    )
+    download_parser.add_argument("--symbol", help="Limit to one symbol (default: all configured symbols)")
+    download_parser.add_argument("--timeframe", help="Limit to one timeframe (default: all configured timeframes)")
+    download_parser.add_argument("--start", help="ISO date, required for mt5 source (e.g. 2024-01-01)")
+    download_parser.add_argument("--end", help="ISO date, required for mt5 source")
+    download_parser.set_defaults(func=cmd_download_data)
 
     for name, (_implemented, phase) in COMMAND_PHASES.items():
         sub = subparsers.add_parser(name, help=f"(pending — Phase {phase})")

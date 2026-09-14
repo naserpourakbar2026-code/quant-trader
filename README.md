@@ -11,7 +11,7 @@ phase by phase (see Section 40 there); progress so far:
 | Phase | Scope                                          | Status  |
 |-------|-------------------------------------------------|---------|
 | 1     | Architecture + environment setup                | ✅ done |
-| 2     | Data ingestion                                  | pending |
+| 2     | Data ingestion                                  | ✅ done |
 | 3     | Data validation                                 | pending |
 | 4     | Feature engine                                  | pending |
 | 5     | Three strategies                                | pending |
@@ -63,11 +63,30 @@ All trading-relevant values live in YAML, never hard-coded:
 Config is loaded and validated through pydantic models in
 `src/core/config.py`.
 
+## Data ingestion (Phase 2)
+
+Two sources, dispatched by `data.source` in `config/settings.yaml`:
+
+- **CSV** (default): place raw files under `data/raw/<SYMBOL>_<TIMEFRAME>.csv`
+  with at least `timestamp,open,high,low,close,volume` columns (optional
+  `tick_volume`, `spread`, `real_volume` are used if present). Nothing is
+  fetched or fabricated — a missing file is reported as `MISSING`, not
+  silently skipped or filled in.
+- **MT5**: Windows-only (CLAUDE.md Section 22). `src/data/mt5_loader.py`
+  imports `MetaTrader5` lazily so it stays importable on Linux/macOS; only
+  calling it requires a running terminal. Use `--start`/`--end` with
+  `download-data` once running on Windows.
+
+Ingestion writes standardized candles (`timestamp, symbol, timeframe, open,
+high, low, close, tick_volume, spread, real_volume`) to
+`data/processed/<SYMBOL>_<TIMEFRAME>.csv`.
+
 ## CLI
 
 ```bash
 python main.py info            # environment/config summary (implemented)
-python main.py download-data   # Phase 2
+python main.py download-data   # ingest historical data (implemented, Phase 2)
+python main.py download-data --symbol EURUSD --timeframe H1
 python main.py validate-data   # Phase 3
 python main.py backtest        # Phase 7
 python main.py optimize        # Phase 8
