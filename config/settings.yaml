@@ -1,0 +1,57 @@
+# Global framework settings.
+# No important values are hard-coded in code — everything trading-relevant
+# lives here (or in strategies.yaml / brokers.yaml) and is loaded through
+# src/core/config.py into validated pydantic models.
+
+account:
+  initial_capital: 2000          # EUR
+  currency: EUR
+
+risk:
+  risk_per_trade: 0.005          # 0.5% default; allowed: 0.0025 / 0.005 / 0.0075 / 0.01
+  allowed_risk_levels: [0.0025, 0.005, 0.0075, 0.01]
+  max_daily_loss: 0.03           # fraction of equity
+  max_weekly_loss: 0.08
+  max_portfolio_drawdown: 0.15   # hard kill switch threshold
+  max_open_positions: 5
+  max_correlated_exposure: 0.02  # fraction of equity across correlated symbols
+  max_leverage: 30
+  max_margin_usage: 0.5
+  daily_trade_limit: 10
+  cooldown_after_consecutive_losses:
+    losses: 3
+    cooldown_bars: 12
+
+data:
+  symbols:
+    - EURUSD
+    - GBPUSD
+    - USDJPY
+    - AUDUSD
+    - USDCAD
+    - USDCHF
+    - NZDUSD
+    - EURJPY
+    - GBPJPY
+  optional_symbols:               # kept separate from forex results (different vol regime)
+    - XAUUSD
+  timeframes: [M5, M15, M30, H1, H4]
+  source: csv                    # csv | mt5
+
+execution:
+  scenarios: [optimistic, realistic, stress]
+  default_scenario: realistic
+
+live_trading: false               # never true by default; see .env LIVE_TRADING/LIVE_CONFIRMATION
+
+paths:
+  data_raw: data/raw
+  data_processed: data/processed
+  data_cache: data/cache
+  reports: reports
+  logs: logs
+
+logging:
+  level: INFO
+  trade_log_file: logs/trades.log
+  system_log_file: logs/system.log

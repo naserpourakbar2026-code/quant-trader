@@ -1,0 +1,16 @@
+# Windows-only dependencies.
+#
+# The MetaTrader5 package wraps the MT5 terminal's native DLLs via ctypes.
+# It cannot be installed or imported on Linux/macOS (including this dev
+# sandbox) — it will fail at `pip install` or `import MetaTrader5` time.
+#
+# Install this file ONLY on a Windows machine that has the MetaTrader 5
+# terminal installed and running:
+#
+#   pip install -r requirements.txt -r requirements-windows.txt
+#
+# The MT5 broker adapter (src/brokers/mt5_adapter.py, added in Phase 12)
+# imports MetaTrader5 lazily so the rest of the framework stays usable
+# on Linux/macOS without this file.
+
+MetaTrader5>=5.0.45,<6.0

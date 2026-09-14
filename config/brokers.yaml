@@ -1,0 +1,40 @@
+# Broker connection configuration.
+#
+# Secrets (API keys, account credentials, passwords) NEVER go here — they
+# live in .env (see .env.example) and are read via src/core/config.py.
+# This file only holds non-secret connection/behavioral parameters.
+#
+# Adapters are implemented in Phase 12 (MT5) and Phase 13 (generic
+# REST/WebSocket). Both are disabled by default.
+
+brokers:
+  mt5:
+    enabled: false
+    name: MetaTrader5
+    environment: demo            # demo | live
+    # login/password/server come from .env: MT5_LOGIN / MT5_PASSWORD / MT5_SERVER
+    terminal_path_env: MT5_TERMINAL_PATH
+    rate_limit:
+      requests_per_second: 5
+    commission:
+      model: none                # broker-dependent; set once known
+    spread_model: broker_provided
+    slippage_model: fixed_pips
+
+  generic_rest:
+    enabled: false
+    name: null
+    environment: demo
+    api_base_url: null
+    websocket_url: null
+    account_id_env: BROKER_ACCOUNT_ID
+    api_key_env: BROKER_API_KEY
+    api_secret_env: BROKER_API_SECRET
+    rate_limit:
+      requests_per_second: 5
+    commission:
+      model: none
+    spread_model: broker_provided
+    slippage_model: fixed_pips
+
+active_broker: null              # must be explicitly set before paper/live trading

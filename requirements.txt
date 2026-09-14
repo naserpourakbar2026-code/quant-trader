@@ -1,0 +1,35 @@
+# Core numerical / data stack
+pandas>=2.1,<3.0
+numpy>=1.26,<2.0
+scipy>=1.11,<2.0
+
+# Research & backtesting engines
+vectorbt>=0.26,<0.27          # open-source edition (NOT vectorbt PRO)
+backtrader>=1.9.78,<2.0
+
+# Optimization & stats
+optuna>=3.5,<4.0
+scikit-learn>=1.4,<2.0
+statsmodels>=0.14,<0.15
+
+# Reporting
+matplotlib>=3.8,<4.0
+plotly>=5.18,<6.0
+
+# Config / validation
+pydantic>=2.6,<3.0
+PyYAML>=6.0,<7.0
+
+# Persistence
+SQLAlchemy>=2.0,<3.0
+
+# Networking (broker APIs)
+requests>=2.31,<3.0
+websockets>=12.0,<13.0
+
+# Testing & logging
+pytest>=8.0,<9.0
+pytest-cov>=4.1,<5.0
+loguru>=0.7,<0.8
+
+python-dotenv>=1.0,<2.0
