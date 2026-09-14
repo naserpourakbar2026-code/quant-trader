@@ -115,10 +115,10 @@ def test_kill_switch_blocks_new_trades_after_a_tiny_drawdown_threshold(db):
 def test_reproducible_with_same_inputs(db):
     raw = _synthetic_raw_candles()
     first = run_paper_trading_session(
-        "trend_following", "EURUSD", "H1", raw, risk_config=_permissive_risk_config(), persist=False,
+        "trend_following", "EURUSD", "H1", raw, risk_config=_permissive_risk_config(), db=db, persist=False,
     )
     second = run_paper_trading_session(
-        "trend_following", "EURUSD", "H1", raw, risk_config=_permissive_risk_config(), persist=False,
+        "trend_following", "EURUSD", "H1", raw, risk_config=_permissive_risk_config(), db=db, persist=False,
     )
     assert first.total_pnl == pytest.approx(second.total_pnl)
     assert len(first.closed_trades) == len(second.closed_trades)
@@ -145,7 +145,7 @@ def test_still_open_position_is_reported_not_force_closed(db):
     be reported as open, never fabricated into a synthetic close."""
     raw = _synthetic_raw_candles()
     result = run_paper_trading_session(
-        "trend_following", "EURUSD", "H1", raw, risk_config=_permissive_risk_config(), persist=False,
+        "trend_following", "EURUSD", "H1", raw, risk_config=_permissive_risk_config(), db=db, persist=False,
     )
     if result.open_position is not None:
         assert result.open_position.symbol == "EURUSD"

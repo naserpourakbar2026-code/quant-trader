@@ -1,10 +1,12 @@
 import pytest
 
+import main
 from main import (
     build_parser,
     cmd_backtest,
     cmd_download_data,
     cmd_info,
+    cmd_kill_switch,
     cmd_monte_carlo,
     cmd_optimize,
     cmd_paper_trade,
@@ -211,3 +213,75 @@ def test_paper_trade_command_requires_strategy_symbol_timeframe():
     parser = build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["paper-trade", "--strategy", "trend_following"])
+
+
+class _FakeKillSwitchEvent:
+    def __init__(self, event_type, reason, equity=None, drawdown=None, created_at="2024-01-01T00:00:00Z"):
+        self.event_type = event_type
+        self.reason = reason
+        self.equity = equity
+        self.drawdown = drawdown
+        self.created_at = created_at
+
+
+class _FakeKillSwitch:
+    """Stands in for src.risk.kill_switch.KillSwitch so this CLI test
+    never touches the real project database -- cmd_kill_switch's own
+    argument-handling/formatting logic is what's under test here, not
+    KillSwitch itself (see tests/test_kill_switch.py for that)."""
+
+    instances: list["_FakeKillSwitch"] = []
+
+    def __init__(self, db=None):
+        self.reset_calls: list[str] = []
+        self._triggered = True
+        _FakeKillSwitch.instances.append(self)
+
+    def is_triggered(self):
+        return self._triggered
+
+    def reset(self, note, **kwargs):
+        self.reset_calls.append(note)
+        self._triggered = False
+
+    def history(self, *, limit=10):
+        return [_FakeKillSwitchEvent("trip", "max_portfolio_drawdown breached", equity=1800.0, drawdown=0.15)][:limit]
+
+
+@pytest.fixture()
+def fake_kill_switch(monkeypatch):
+    _FakeKillSwitch.instances = []
+    monkeypatch.setattr(main, "KillSwitch", _FakeKillSwitch)
+    return _FakeKillSwitch
+
+
+def test_kill_switch_command_shows_status_and_history(fake_kill_switch, capsys):
+    parser = build_parser()
+    args = parser.parse_args(["kill-switch"])
+    assert args.func is cmd_kill_switch
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "TRIGGERED" in out
+    assert "max_portfolio_drawdown breached" in out
+    assert fake_kill_switch.instances[0].reset_calls == []
+
+
+def test_kill_switch_command_records_a_reset_when_flag_given(fake_kill_switch, capsys):
+    parser = build_parser()
+    args = parser.parse_args(["kill-switch", "--reset", "reviewed manually, resuming"])
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "reset recorded" in out
+    assert "clear" in out  # reset() flips the fake's internal state before the status line prints
+    assert fake_kill_switch.instances[0].reset_calls == ["reviewed manually, resuming"]
+
+
+def test_kill_switch_command_respects_history_limit(fake_kill_switch, capsys):
+    parser = build_parser()
+    args = parser.parse_args(["kill-switch", "--history", "0"])
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "max_portfolio_drawdown breached" not in out

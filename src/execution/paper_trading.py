@@ -112,6 +112,7 @@ def run_paper_trading_session(
     scenario: str | None = None,
     initial_capital: float | None = None,
     risk_config=None,
+    brokers: list | None = None,
     persist: bool = True,
     db=None,
 ) -> PaperTradingSessionResult:
@@ -126,7 +127,14 @@ def run_paper_trading_session(
     feature_df = compute_features(raw_df, feature_params)
     strategy = create_strategy(strategy_family, strategy_params)
     simulator = ExecutionSimulator(settings.execution.costs[scenario])
-    risk_engine = RiskEngine(risk_cfg, capital)
+    # RiskEngine's kill switch is durable (src.risk.kill_switch): sharing
+    # this call's own `db` means a trip recorded by one paper-trading
+    # session blocks every other session against the same database too,
+    # not just this one (CLAUDE.md Section 7's "hard" kill switch).
+    # `brokers`, if given, are notified via emergency_stop() on a trip
+    # (Section 27) -- empty by default since this session replays
+    # historical data and never holds a real broker connection.
+    risk_engine = RiskEngine(risk_cfg, capital, db=db, brokers=brokers)
 
     # generate_signals_vectorized() is purely causal (rolling windows,
     # never a future row) -- by the same "single source of truth"

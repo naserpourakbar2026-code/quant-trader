@@ -24,7 +24,7 @@ phase by phase (see Section 40 there); progress so far:
 | 12    | MT5 adapter (code + mocked tests, Windows-only) | ✅ done |
 | 13    | Generic broker API adapter                      | ✅ done |
 | 14    | Paper trading                                   | ✅ done |
-| 15    | Risk & kill switch                              | pending |
+| 15    | Risk & kill switch                              | ✅ done |
 | 16    | Reporting                                       | pending |
 | 17    | Full integration tests                          | pending |
 | 18    | Final robustness evaluation                     | pending |
@@ -91,7 +91,12 @@ row per *closed* trade, the latter holding exactly CLAUDE.md Section
 SL, TP, size, risk, spread, slippage, exit, PnL, R multiple, reason) —
 the first phase anything gets logged at that per-trade granularity
 (Phases 6-11's `experiments` table only ever stored aggregate metrics).
-More tables arrive with the phases that need them.
+And `kill_switch_events` (`src/risk/models.py`, Phase 15) — an
+append-only audit log (never a mutable row) of every kill-switch trip
+and reset, which is what makes the kill switch durable across sessions
+and process restarts (Section 7's "hard" kill switch), not a fresh
+in-memory flag every run forgets. More tables arrive with the phases
+that need them.
 
 ## Data ingestion (Phase 2)
 
@@ -601,6 +606,45 @@ computation is provably identical to recomputing it fresh on
 `df.iloc[:i+1]` every iteration, just without turning the loop from O(n)
 into O(n²) for zero behavioral difference.
 
+## Risk & kill switch (Phase 15)
+
+Phase 14's `RiskEngine` already had to implement most of CLAUDE.md
+Section 7's checks — paper trading's own pipeline requires a Risk Engine
+step. Phase 15 formalizes the one piece that mattered most and wasn't
+durable yet: the hard kill switch.
+
+- **`src/risk/kill_switch.py`'s `KillSwitch`** is an append-only audit
+  log (`kill_switch_events`, never a mutable singleton row) of every
+  trip and reset. `RiskEngine` now reads it once at construction — a
+  brand-new `RiskEngine` (a brand-new paper-trading session, potentially
+  in a brand-new process) starts **already triggered** if *any* earlier
+  session recorded a trip against the same database. That's what "hard"
+  means in Section 7: one session's drawdown breach has to stop every
+  other session too, not just itself. A trip logs to the system log
+  (Section 28's "risk violation, kill switch events") and, if broker
+  adapters were registered with the `RiskEngine`, calls their
+  `emergency_stop()` (Section 27) — empty by default, since paper
+  trading replays historical data and holds no real broker connection.
+- **Reset is always an explicit human action** — `KillSwitch.reset()`
+  requires a note explaining why, recorded in the same audit trail as
+  the trip; nothing resets itself.
+- **`python main.py kill-switch`** shows the current status and recent
+  history; `--reset "<note>"` records a reset. `RiskEngine.evaluate()`
+  also logs every rejection to the system log (Section 28's "risk
+  violation").
+- **`src/risk/correlated_exposure.py`'s `CorrelatedExposureMonitor`**
+  implements Section 7's `max_correlated_exposure` — deliberately kept
+  *outside* `RiskEngine`, since every engine in this codebase (including
+  RiskEngine) is scoped to one symbol per call, and there's nothing to
+  be "correlated" with inside a single-symbol session. It's a standalone
+  utility for a multi-symbol orchestrator that doesn't exist yet: given
+  each open position's risk amount by symbol and a symbol x symbol
+  correlation matrix (the same shape Phase 11's
+  `correlation_matrix()` produces), it caps combined risk (not raw
+  notional — that scales with leverage and would make the same
+  percentage mean different things account to account) across symbols
+  correlated above a threshold at `max_correlated_exposure` of equity.
+
 ## CLI
 
 ```bash
@@ -621,6 +665,8 @@ python main.py portfolio        # implemented, Phase 11 -- all enabled combinati
 python main.py portfolio --timeframe H1 --top-n 5 --min-trades 20
 python main.py paper-trade --strategy trend_following --symbol EURUSD --timeframe H1  # implemented, Phase 14
 python main.py paper-trade --strategy trend_following --symbol EURUSD --timeframe H1 --capital 5000 --scenario stress
+python main.py kill-switch     # implemented, Phase 15 -- status + history
+python main.py kill-switch --reset "reviewed manually, resuming"
 python main.py live            # not yet implemented (requires LIVE_TRADING=true AND LIVE_CONFIRMATION=true)
 python main.py report          # Phase 16
 ```
@@ -639,6 +685,11 @@ pytest
 Live orders are only ever sent if **both** `LIVE_TRADING=true` and
 `LIVE_CONFIRMATION=true` are set in `.env`. Either being false/unset keeps
 the system in paper/dry-run mode. See `src/core/config.py:is_live_trading_enabled`.
+Every `BrokerAdapter` (Phase 12/13) additionally refuses to send an order
+on an `environment="live"` connection under the same two-flag rule
+(`_ensure_order_allowed()`), and the durable kill switch (Phase 15) can
+call `emergency_stop()` on any registered adapter the moment a drawdown
+breach is recorded — see "Risk & kill switch" above.
 
 ## Project structure
 

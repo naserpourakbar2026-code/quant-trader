@@ -21,6 +21,7 @@ from src.execution.paper_trading import run_paper_trading_session
 from src.montecarlo.mc_engine import run_monte_carlo
 from src.optimization.optuna_engine import assess_parameter_stability, run_optimization
 from src.portfolio.portfolio_engine import run_portfolio_analysis
+from src.risk.kill_switch import KillSwitch
 from src.walkforward.wfa_engine import run_walk_forward
 
 # command -> (implemented, scheduled phase)
@@ -46,6 +47,7 @@ def cmd_info(_args: argparse.Namespace) -> int:
     print(f"  active broker          : {brokers.active_broker or '(none configured)'}")
     print(f"  live trading enabled   : {is_live_trading_enabled()} "
           f"(requires LIVE_TRADING=true AND LIVE_CONFIRMATION=true)")
+    print("  kill switch            : see `python main.py kill-switch` for status/history/reset")
     return 0
 
 
@@ -392,6 +394,29 @@ def cmd_paper_trade(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_kill_switch(args: argparse.Namespace) -> int:
+    """Show the durable kill switch's current status/history, or record
+    a reset (Phase 15, CLAUDE.md Sections 7, 27). A reset is always an
+    explicit human action with a required note — never automatic."""
+    switch = KillSwitch()
+    if args.reset:
+        switch.reset(args.reset)
+        print(f"Kill switch reset recorded: {args.reset!r}")
+
+    triggered = switch.is_triggered()
+    print(f"Kill switch status: {'TRIGGERED' if triggered else 'clear'}")
+
+    events = switch.history(limit=args.history)
+    if events:
+        print(f"\nLast {len(events)} event(s) (newest first):")
+        for event in events:
+            extra = ""
+            if event.drawdown is not None:
+                extra = f" (equity={event.equity:.2f}, drawdown={event.drawdown:.2%})"
+            print(f"  {event.created_at} {event.event_type:5s} {event.reason}{extra}")
+    return 0
+
+
 def _not_implemented(name: str, phase: int) -> int:
     logger = get_system_logger()
     message = (
@@ -502,6 +527,15 @@ def build_parser() -> argparse.ArgumentParser:
     paper_trade_parser.add_argument("--scenario", help="optimistic|realistic|stress (default: execution.default_scenario)")
     paper_trade_parser.add_argument("--capital", type=float, help="Initial capital override (default: account.initial_capital)")
     paper_trade_parser.set_defaults(func=cmd_paper_trade)
+
+    kill_switch_parser = subparsers.add_parser(
+        "kill-switch", help="Show/reset the durable risk kill switch (Phase 15)"
+    )
+    kill_switch_parser.add_argument(
+        "--reset", help="Record a reset with this note (a human decision — never automatic)"
+    )
+    kill_switch_parser.add_argument("--history", type=int, default=10, help="Number of past events to show (default: 10)")
+    kill_switch_parser.set_defaults(func=cmd_kill_switch)
 
     for name, (_implemented, phase) in COMMAND_PHASES.items():
         sub = subparsers.add_parser(name, help=f"(pending — Phase {phase})")

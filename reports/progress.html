@@ -50,9 +50,9 @@
     <p class="subtitle">Static snapshot — open this file directly, no server or code execution needed.</p>
 
     <div class="card">
-      <strong>Current phase:</strong> Phase 15 — Risk &amp; kill switch
-      <div class="progress-bar"><div class="progress-fill" style="width:78%"></div></div>
-      <div style="color:var(--muted); font-size:0.85rem;">14 of 18 phases done</div>
+      <strong>Current phase:</strong> Phase 16 — Reporting
+      <div class="progress-bar"><div class="progress-fill" style="width:83%"></div></div>
+      <div style="color:var(--muted); font-size:0.85rem;">15 of 18 phases done</div>
     </div>
 
     <div class="card">
@@ -130,10 +130,10 @@
         <td>Paper trading</td>
         <td><span class="badge done">Done</span></td>
       </tr>
-      <tr class="pending">
+      <tr class="done">
         <td>15</td>
         <td>Risk &amp; kill switch</td>
-        <td><span class="badge pending">Pending</span></td>
+        <td><span class="badge done">Done</span></td>
       </tr>
       <tr class="pending">
         <td>16</td>
@@ -155,7 +155,7 @@
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0;">Files created so far (102)</h2>
+      <h2 style="margin-top:0;">Files created so far (112)</h2>
       <div class="group">
         <h3>(root)/</h3>
         <ul>
@@ -230,6 +230,11 @@
           <li>src/data/schema.py</li>
           <li>src/data/validation.py</li>
           <li>src/execution/__init__.py</li>
+          <li>src/execution/models.py</li>
+          <li>src/execution/paper_trading.py</li>
+          <li>src/execution/position_manager.py</li>
+          <li>src/execution/simulator.py</li>
+          <li>src/execution/trade_store.py</li>
           <li>src/features/__init__.py</li>
           <li>src/features/engine.py</li>
           <li>src/features/indicators.py</li>
@@ -246,6 +251,7 @@
           <li>src/portfolio/run_store.py</li>
           <li>src/reporting/__init__.py</li>
           <li>src/risk/__init__.py</li>
+          <li>src/risk/engine.py</li>
           <li>src/strategies/__init__.py</li>
           <li>src/strategies/base.py</li>
           <li>src/strategies/mean_reversion.py</li>
@@ -270,6 +276,7 @@
           <li>tests/test_csv_loader.py</li>
           <li>tests/test_data_schema.py</li>
           <li>tests/test_db.py</li>
+          <li>tests/test_execution_simulator.py</li>
           <li>tests/test_experiment_store.py</li>
           <li>tests/test_feature_engine.py</li>
           <li>tests/test_generic_rest_adapter.py</li>
@@ -281,11 +288,14 @@
           <li>tests/test_mt5_adapter.py</li>
           <li>tests/test_mt5_loader.py</li>
           <li>tests/test_optuna_engine.py</li>
+          <li>tests/test_paper_trading.py</li>
           <li>tests/test_portfolio_engine.py</li>
+          <li>tests/test_position_manager.py</li>
           <li>tests/test_project_structure.py</li>
           <li>tests/test_regime.py</li>
           <li>tests/test_reproducibility.py</li>
           <li>tests/test_resilience.py</li>
+          <li>tests/test_risk_engine.py</li>
           <li>tests/test_stops.py</li>
           <li>tests/test_strategies_integration.py</li>
           <li>tests/test_strategy_base.py</li>
@@ -300,7 +310,7 @@
       </div>
     </div>
 
-    <footer>Generated 2026-09-14 16:44 UTC by scripts/generate_progress_report.py</footer>
+    <footer>Generated 2026-09-14 16:57 UTC by scripts/generate_progress_report.py</footer>
   </div>
 </body>
 </html>

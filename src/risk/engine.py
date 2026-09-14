@@ -1,21 +1,28 @@
-"""Risk Engine (CLAUDE.md Section 7): the gate between a strategy's
-signal and a virtual/real order. Paper trading (Phase 14) is the first
-consumer; Phase 15 formalizes the hard drawdown kill switch as its own
-named, more thoroughly tested concept and wires the same checks into
-live execution — the checks themselves already have to exist here
-because paper trading's own pipeline (Section 26) requires a Risk Engine
-step, not just an execution simulator.
+"""Risk Engine (CLAUDE.md Sections 7, 27, 28): the gate between a
+strategy's signal and a virtual/real order. Paper trading (Phase 14) is
+the first consumer.
+
+Phase 15 adds the *durable* half of the hard kill switch
+(`src.risk.kill_switch.KillSwitch`): `kill_switch_triggered` below is
+this instance's own drawdown-based flag (per Section 7, "never resets
+itself" once True), but a fresh RiskEngine now starts already-triggered
+if *any* earlier session recorded a trip in the same database — one
+session's kill switch stopping only itself would defeat the entire
+point of calling it "hard." A trip is also logged to the system log
+(Section 28's "risk violation, kill switch events") and, if broker
+adapters are supplied, calls their own `emergency_stop()` (Section 27).
 
 Deliberately excluded here, and why: `max_correlated_exposure` (Section
 7) is a cross-*symbol* concept, but this engine's caller
 (run_paper_trading_session) is scoped to one strategy/symbol/timeframe —
 same as every other engine in this codebase (run_screening,
 run_optimization, run_walk_forward, run_monte_carlo). There is nothing
-else in scope to be "correlated" with inside a single session. A
-portfolio-level exposure check belongs to a multi-symbol orchestrator
-that doesn't exist yet, reusing Phase 11's correlation machinery when it
-does — implementing a same-symbol-only stand-in here would just be
-dead code today (this engine already never lets a symbol carry a second
+else in scope to be "correlated" with inside a single session.
+`src.risk.correlated_exposure.CorrelatedExposureMonitor` (Phase 15)
+implements that check as a standalone utility instead, ready for a
+multi-symbol orchestrator (reusing Phase 11's correlation machinery) to
+call once one exists — a same-symbol-only stand-in here would just be
+dead code (this engine already never lets a symbol carry a second
 concurrent position).
 """
 from __future__ import annotations
@@ -25,6 +32,9 @@ from dataclasses import dataclass
 import pandas as pd
 
 from src.core.config import RiskConfig
+from src.core.db import Database
+from src.core.logging import get_system_logger
+from src.risk.kill_switch import KillSwitch
 from src.strategies.base import PositionSizeResult
 
 
@@ -35,8 +45,12 @@ class RiskDecision:
 
 
 class RiskEngine:
-    def __init__(self, cfg: RiskConfig, initial_capital: float) -> None:
+    def __init__(
+        self, cfg: RiskConfig, initial_capital: float, *, db: Database | None = None, brokers: list | None = None,
+    ) -> None:
         self.cfg = cfg
+        self.kill_switch = KillSwitch(db=db)
+        self.brokers = brokers or []
         self.peak_equity = initial_capital
         self.day_start_equity = initial_capital
         self.week_start_equity = initial_capital
@@ -45,7 +59,11 @@ class RiskEngine:
         self.trades_opened_today = 0
         self.consecutive_losses = 0
         self.cooldown_remaining_bars = 0
-        self.kill_switch_triggered = False
+        # Inherit any earlier session's trip -- checked once here, not
+        # re-polled every bar (this instance's own flag never resets
+        # itself either way, so one read at construction is sufficient
+        # and avoids a database round-trip on every single update_equity()).
+        self.kill_switch_triggered = self.kill_switch.is_triggered()
 
     def update_equity(self, equity: float, timestamp: pd.Timestamp) -> None:
         """Call once per bar with the current mark-to-market equity
@@ -65,8 +83,12 @@ class RiskEngine:
 
         self.peak_equity = max(self.peak_equity, equity)
         drawdown = (self.peak_equity - equity) / self.peak_equity if self.peak_equity > 0 else 0.0
-        if drawdown >= self.cfg.max_portfolio_drawdown:
+        if not self.kill_switch_triggered and drawdown >= self.cfg.max_portfolio_drawdown:
             self.kill_switch_triggered = True  # CLAUDE.md Section 7's hard kill switch: never resets itself
+            self.kill_switch.trip(
+                f"max_portfolio_drawdown breached: {drawdown:.2%} >= {self.cfg.max_portfolio_drawdown:.2%}",
+                equity=equity, drawdown=drawdown, brokers=self.brokers,
+            )
 
         if self.cooldown_remaining_bars > 0:
             self.cooldown_remaining_bars -= 1
@@ -91,6 +113,14 @@ class RiskEngine:
         sizing itself, so there is exactly one formula for "how big"
         (BaseStrategy.calculate_position_size) and no risk of the two
         drifting apart."""
+        decision = self._evaluate(equity=equity, position_size=position_size, entry_price=entry_price, open_positions_count=open_positions_count)
+        if not decision.approved:
+            get_system_logger().info(f"Risk check rejected an order: {decision.reason}")
+        return decision
+
+    def _evaluate(
+        self, *, equity: float, position_size: PositionSizeResult, entry_price: float, open_positions_count: int,
+    ) -> RiskDecision:
         if self.kill_switch_triggered:
             return RiskDecision(False, "kill switch active: max portfolio drawdown breached")
         if self.cooldown_remaining_bars > 0:
