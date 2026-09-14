@@ -11,6 +11,10 @@ can never drift from what generate_signal() would decide live.
 
 Every run is persisted as an Experiment (src.backtest.experiment_store)
 with a unique ID and full reproducibility metadata (Section 36).
+
+get_trade_returns() exposes the same run's per-trade returns without
+persisting anything — the raw material Phase 10's Monte Carlo engine
+(src.montecarlo.mc_engine) resamples from.
 """
 from __future__ import annotations
 
@@ -80,10 +84,8 @@ def _extract_metrics(pf: "vbt.Portfolio") -> dict:
     return metrics
 
 
-def run_screening(
+def _build_portfolio(
     strategy_family: str,
-    symbol: str,
-    timeframe: str,
     raw_df: pd.DataFrame,
     *,
     strategy_params: dict | None = None,
@@ -91,20 +93,13 @@ def run_screening(
     scenario: str | None = None,
     initial_capital: float | None = None,
     warmup_df: pd.DataFrame | None = None,
-    persist: bool = True,
-    db: Database | None = None,
-) -> ScreeningResult:
-    """Screen one strategy/symbol/timeframe/parameter combination.
+) -> tuple["vbt.Portfolio", pd.DataFrame, str, object]:
+    """Shared signal-to-portfolio construction used by both run_screening()
+    (aggregate metrics) and get_trade_returns() (per-trade returns, for
+    Phase 10 Monte Carlo resampling) — one place builds the vectorbt
+    Portfolio so both consumers see the exact same trades.
 
-    `raw_df` is standardized candle data (src.data.schema columns) for a
-    single symbol/timeframe — e.g. from src.data.csv_loader.load_csv().
-
-    `warmup_df`, if given, is *earlier* standardized candles prepended
-    only so every indicator has proper history (no artificial NaN
-    warm-up gap) — used by Phase 9's walk-forward engine so a
-    validation/OOS window's indicators aren't computed in a vacuum.
-    Entries/exits/metrics are still computed only over `raw_df`'s own
-    rows; `warmup_df` never contributes a trade or a metric.
+    Returns (pf, indexed_feature_df_scored_range, scenario, strategy).
     """
     settings = load_settings()
     scenario = scenario or settings.execution.default_scenario
@@ -145,6 +140,44 @@ def run_screening(
         fees=cost.commission_pct,
         slippage=cost.slippage_pct,
     )
+    return pf, indexed, scenario, strat
+
+
+def run_screening(
+    strategy_family: str,
+    symbol: str,
+    timeframe: str,
+    raw_df: pd.DataFrame,
+    *,
+    strategy_params: dict | None = None,
+    feature_params: FeatureParams | None = None,
+    scenario: str | None = None,
+    initial_capital: float | None = None,
+    warmup_df: pd.DataFrame | None = None,
+    persist: bool = True,
+    db: Database | None = None,
+) -> ScreeningResult:
+    """Screen one strategy/symbol/timeframe/parameter combination.
+
+    `raw_df` is standardized candle data (src.data.schema columns) for a
+    single symbol/timeframe — e.g. from src.data.csv_loader.load_csv().
+
+    `warmup_df`, if given, is *earlier* standardized candles prepended
+    only so every indicator has proper history (no artificial NaN
+    warm-up gap) — used by Phase 9's walk-forward engine so a
+    validation/OOS window's indicators aren't computed in a vacuum.
+    Entries/exits/metrics are still computed only over `raw_df`'s own
+    rows; `warmup_df` never contributes a trade or a metric.
+    """
+    pf, indexed, scenario, strat = _build_portfolio(
+        strategy_family,
+        raw_df,
+        strategy_params=strategy_params,
+        feature_params=feature_params,
+        scenario=scenario,
+        initial_capital=initial_capital,
+        warmup_df=warmup_df,
+    )
 
     metrics = _extract_metrics(pf)
     experiment_id = str(uuid.uuid4())
@@ -179,6 +212,34 @@ def run_screening(
         parameters=dict(strat.params),
         metrics=metrics,
     )
+
+
+def get_trade_returns(
+    strategy_family: str,
+    raw_df: pd.DataFrame,
+    *,
+    strategy_params: dict | None = None,
+    feature_params: FeatureParams | None = None,
+    scenario: str | None = None,
+    initial_capital: float | None = None,
+    warmup_df: pd.DataFrame | None = None,
+) -> np.ndarray:
+    """Per-trade fractional returns from the same vectorbt Portfolio
+    run_screening() would build (same signals, same cost scenario) — the
+    empirical distribution Phase 10's Monte Carlo engine resamples from
+    (CLAUDE.md Section 17). Not persisted as an Experiment: this is a raw
+    input to Monte Carlo, not a result in its own right.
+    """
+    pf, _indexed, _scenario, _strat = _build_portfolio(
+        strategy_family,
+        raw_df,
+        strategy_params=strategy_params,
+        feature_params=feature_params,
+        scenario=scenario,
+        initial_capital=initial_capital,
+        warmup_df=warmup_df,
+    )
+    return pf.trades.returns.values
 
 
 def screen_parameter_grid(

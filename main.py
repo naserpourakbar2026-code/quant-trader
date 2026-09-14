@@ -17,12 +17,12 @@ from src.core.logging import configure_logging, get_system_logger
 from src.data.csv_loader import load_csv
 from src.data.ingestion import run_download
 from src.data.validation import run_validation
+from src.montecarlo.mc_engine import run_monte_carlo
 from src.optimization.optuna_engine import assess_parameter_stability, run_optimization
 from src.walkforward.wfa_engine import run_walk_forward
 
 # command -> (implemented, scheduled phase)
 COMMAND_PHASES: dict[str, tuple[bool, int]] = {
-    "monte-carlo": (False, 10),
     "portfolio": (False, 11),
     "paper-trade": (False, 14),
     "live": (False, 14),
@@ -271,6 +271,43 @@ def cmd_walk_forward(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_monte_carlo(args: argparse.Namespace) -> int:
+    """Bootstrap-resample a strategy's observed trade returns thousands
+    of times to estimate an outcome distribution (Phase 10, CLAUDE.md
+    Section 17). Deliberately scoped to a single, explicit combination
+    with fixed parameters — this evaluates a strategy already chosen
+    elsewhere (e.g. via `optimize`/`walk-forward`), it does not search
+    for one."""
+    strategies_cfg = load_strategies()
+    definition = strategies_cfg.strategies.get(args.strategy)
+    if definition is None:
+        print(f"Unknown strategy {args.strategy!r}; expected one of {sorted(strategies_cfg.strategies)}", file=sys.stderr)
+        return 1
+
+    try:
+        raw_df = load_csv(args.symbol, args.timeframe)
+    except FileNotFoundError as exc:
+        print(str(exc))
+        return 0
+
+    try:
+        result = run_monte_carlo(
+            args.strategy,
+            args.symbol,
+            args.timeframe,
+            raw_df,
+            scenario=args.scenario,
+            n_simulations=args.simulations,
+            seed=args.seed,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return 0
+
+    print(result.to_text())
+    return 0
+
+
 def _not_implemented(name: str, phase: int) -> int:
     logger = get_system_logger()
     message = (
@@ -343,6 +380,17 @@ def build_parser() -> argparse.ArgumentParser:
     wf_parser.add_argument("--scenario", help="optimistic|realistic|stress (default: execution.default_scenario)")
     wf_parser.add_argument("--seed", type=int, help="Random seed override (default: optimization.random_seed)")
     wf_parser.set_defaults(func=cmd_walk_forward)
+
+    mc_parser = subparsers.add_parser(
+        "monte-carlo", help="Bootstrap-resample observed trade returns to estimate an outcome distribution (Phase 10)"
+    )
+    mc_parser.add_argument("--strategy", required=True, help="Strategy family (see config/strategies.yaml)")
+    mc_parser.add_argument("--symbol", required=True, help="Symbol to analyze")
+    mc_parser.add_argument("--timeframe", required=True, help="Timeframe to analyze")
+    mc_parser.add_argument("--simulations", type=int, help="Number of simulations (default: montecarlo.n_simulations)")
+    mc_parser.add_argument("--scenario", help="optimistic|realistic|stress (default: execution.default_scenario)")
+    mc_parser.add_argument("--seed", type=int, help="Random seed override (default: montecarlo.random_seed)")
+    mc_parser.set_defaults(func=cmd_monte_carlo)
 
     for name, (_implemented, phase) in COMMAND_PHASES.items():
         sub = subparsers.add_parser(name, help=f"(pending — Phase {phase})")

@@ -19,7 +19,7 @@ phase by phase (see Section 40 there); progress so far:
 | 7     | Backtrader validation engine                    | ✅ done |
 | 8     | Optuna optimization                             | ✅ done |
 | 9     | Walk-forward                                    | ✅ done |
-| 10    | Monte Carlo                                     | pending |
+| 10    | Monte Carlo                                     | ✅ done |
 | 11    | Portfolio engine                                | pending |
 | 12    | MT5 adapter (code + mocked tests, Windows-only) | pending |
 | 13    | Generic broker API adapter                      | pending |
@@ -77,8 +77,11 @@ validation run, distinguished by an `engine` column ("vectorbt" |
 "optuna"`. Also holds `walkforward_windows`
 (`src/walkforward/models.py`) — one row per walk-forward window (Phase
 9), a different kind of record (three sub-periods and a pass/fail
-verdict) than a single backtest `Experiment`. More tables arrive with
-the phases that need them (Monte Carlo results, ...).
+verdict) than a single backtest `Experiment`. And `montecarlo_runs`
+(`src/montecarlo/models.py`) — one row per Monte Carlo run (Phase 10): the
+observed trade count it resampled from, simulation count/seed, and the
+resulting outcome-distribution summary. More tables arrive with the
+phases that need them.
 
 ## Data ingestion (Phase 2)
 
@@ -330,6 +333,48 @@ repeats ("rolling windows").
   OOS metrics and verdict, plus the aggregate OOS pass rate and
   parameter-consistency table.
 
+## Monte Carlo analysis (Phase 10)
+
+`src/montecarlo/mc_engine.py` — CLAUDE.md Section 17: a single historical
+backtest is one draw from an unknown distribution of possible outcomes,
+not a promise. This bootstrap-resamples a strategy's own observed
+per-trade returns (from the vectorbt screening engine, Phase 6 —
+`src.backtest.vectorbt_engine.get_trade_returns()`, a thin wrapper that
+shares its Portfolio construction with `run_screening()` so the trades
+Monte Carlo resamples from are exactly the trades screening/optimization
+scored) thousands of times and reports the *spread* of outcomes, not a
+single number.
+
+- Each of `montecarlo.n_simulations` (default 1000) draws resamples
+  `len(observed_trades)` trades **with replacement** — randomizing both
+  trade order and trade-return composition (Section 17) — then adds
+  independent Gaussian noise per resampled trade
+  (`montecarlo.execution_noise_std`) to represent slippage/execution
+  variation beyond the single fixed cost scenario already baked into the
+  observed returns. The resampled sequence is compounded into a
+  simulated equity curve starting from `initial_capital`.
+- Reports exactly Section 17's list: median/5th/95th percentile return,
+  worst drawdown, 95th-percentile drawdown, median/95th-percentile/worst
+  losing streak, probability of ruin (equity ever falling to
+  `montecarlo.ruin_threshold` — default 50% — of initial capital in a
+  simulation), and probability of a negative return.
+- `is_fragile` is a stated, adjustable rule (`montecarlo.fragility` in
+  `config/settings.yaml`): probability of ruin or probability of a
+  negative return exceeding a configured cutoff — Section 17's "fragile
+  under Monte Carlo strategies are not robust", made concrete rather than
+  left to eyeballing a chart.
+- Too few observed trades (below `montecarlo.min_trades`) never blocks
+  the run — the result is still computed, just marked
+  `insufficient_data` and printed with an explicit warning, per Section
+  18/31's "trade count" robustness factor.
+- Persists one `MonteCarloRun` row per call (`src/montecarlo/run_store.py`)
+  with full reproducibility metadata (Section 36): seed, code/library
+  versions, the parameters evaluated.
+- `python main.py monte-carlo` requires an explicit `--strategy --symbol
+  --timeframe` (evaluates a strategy/parameter combination already
+  chosen elsewhere — it does not search for one) and prints the full
+  report.
+
 ## CLI
 
 ```bash
@@ -344,7 +389,8 @@ python main.py optimize --strategy trend_following --symbol EURUSD --timeframe H
 python main.py optimize --strategy mean_reversion --symbol EURUSD --timeframe H1 --trials 100 --scenario stress
 python main.py walk-forward --strategy trend_following --symbol EURUSD --timeframe H1  # implemented, Phase 9
 python main.py walk-forward --strategy trend_following --symbol EURUSD --timeframe H1 --window-bars 600 --step-bars 300
-python main.py monte-carlo     # Phase 10
+python main.py monte-carlo --strategy trend_following --symbol EURUSD --timeframe H1  # implemented, Phase 10
+python main.py monte-carlo --strategy trend_following --symbol EURUSD --timeframe H1 --simulations 5000 --scenario stress
 python main.py portfolio       # Phase 11
 python main.py paper-trade     # Phase 14
 python main.py live            # Phase 14 (requires LIVE_TRADING=true AND LIVE_CONFIRMATION=true)

@@ -50,9 +50,9 @@
     <p class="subtitle">Static snapshot — open this file directly, no server or code execution needed.</p>
 
     <div class="card">
-      <strong>Current phase:</strong> Phase 10 — Monte Carlo analysis
-      <div class="progress-bar"><div class="progress-fill" style="width:50%"></div></div>
-      <div style="color:var(--muted); font-size:0.85rem;">9 of 18 phases done</div>
+      <strong>Current phase:</strong> Phase 11 — Portfolio engine
+      <div class="progress-bar"><div class="progress-fill" style="width:56%"></div></div>
+      <div style="color:var(--muted); font-size:0.85rem;">10 of 18 phases done</div>
     </div>
 
     <div class="card">
@@ -105,10 +105,10 @@
         <td>Walk-forward analysis</td>
         <td><span class="badge done">Done</span></td>
       </tr>
-      <tr class="pending">
+      <tr class="done">
         <td>10</td>
         <td>Monte Carlo analysis</td>
-        <td><span class="badge pending">Pending</span></td>
+        <td><span class="badge done">Done</span></td>
       </tr>
       <tr class="pending">
         <td>11</td>
@@ -155,7 +155,7 @@
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0;">Files created so far (82)</h2>
+      <h2 style="margin-top:0;">Files created so far (86)</h2>
       <div class="group">
         <h3>(root)/</h3>
         <ul>
@@ -244,6 +244,9 @@
           <li>src/strategies/targets.py</li>
           <li>src/strategies/trend_following.py</li>
           <li>src/walkforward/__init__.py</li>
+          <li>src/walkforward/models.py</li>
+          <li>src/walkforward/wfa_engine.py</li>
+          <li>src/walkforward/window_store.py</li>
         </ul>
       </div>
       <div class="group">
@@ -276,11 +279,12 @@
           <li>tests/test_trend_following.py</li>
           <li>tests/test_validation.py</li>
           <li>tests/test_vectorbt_engine.py</li>
+          <li>tests/test_wfa_engine.py</li>
         </ul>
       </div>
     </div>
 
-    <footer>Generated 2026-09-14 14:58 UTC by scripts/generate_progress_report.py</footer>
+    <footer>Generated 2026-09-14 16:01 UTC by scripts/generate_progress_report.py</footer>
   </div>
 </body>
 </html>

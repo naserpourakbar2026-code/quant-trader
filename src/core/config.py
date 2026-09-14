@@ -181,6 +181,24 @@ class OptimizationConfig(BaseModel):
     stability: StabilityConfig
 
 
+class MonteCarloFragilityConfig(BaseModel):
+    """Stated, adjustable thresholds for CLAUDE.md Section 17's "fragile
+    under MC strategies are not robust" — not a claim these exact cutoffs
+    are the only reasonable ones."""
+
+    max_probability_of_ruin: float = Field(ge=0, le=1)
+    max_probability_of_negative_return: float = Field(ge=0, le=1)
+
+
+class MonteCarloConfig(BaseModel):
+    n_simulations: int = Field(gt=0)
+    random_seed: int
+    ruin_threshold: float = Field(gt=0, lt=1)  # equity <= this fraction of initial capital counts as "ruin"
+    execution_noise_std: float = Field(ge=0)  # extra per-trade return noise layered on resampled historical returns
+    min_trades: int = Field(gt=0)  # below this, results are still reported but flagged unreliable
+    fragility: MonteCarloFragilityConfig
+
+
 class PathsConfig(BaseModel):
     data_raw: str
     data_processed: str
@@ -203,6 +221,7 @@ class AppConfig(BaseModel):
     validation: ValidationConfig
     features: FeaturesConfig
     optimization: OptimizationConfig
+    montecarlo: MonteCarloConfig
     live_trading: bool
     paths: PathsConfig
     logging: LoggingConfig

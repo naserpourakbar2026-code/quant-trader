@@ -105,6 +105,20 @@ optimization:
     neighbor_step_pct: 0.10    # float params: +/- this fraction when checking neighborhood stability
     neighbor_step_int: 1       # int params: +/- this many steps
 
+montecarlo:
+  # CLAUDE.md Section 17: bootstrap-resample a strategy's own historical
+  # trade returns (from the vectorbt screening engine, Phase 6) to
+  # estimate a distribution of outcomes rather than trusting the single
+  # historical sequence. Values below are stated, adjustable defaults.
+  n_simulations: 1000
+  random_seed: 42
+  ruin_threshold: 0.5          # equity <= this fraction of initial capital during a simulation counts as "ruin"
+  execution_noise_std: 0.0002  # extra Gaussian noise per resampled trade return, modeling slippage/execution variation
+  min_trades: 10               # fewer observed trades than this -> results reported but flagged unreliable
+  fragility:
+    max_probability_of_ruin: 0.05
+    max_probability_of_negative_return: 0.5
+
 live_trading: false               # never true by default; see .env LIVE_TRADING/LIVE_CONFIRMATION
 
 paths:
