@@ -50,9 +50,9 @@
     <p class="subtitle">Static snapshot — open this file directly, no server or code execution needed.</p>
 
     <div class="card">
-      <strong>Current phase:</strong> Phase 17 — Full integration tests
-      <div class="progress-bar"><div class="progress-fill" style="width:89%"></div></div>
-      <div style="color:var(--muted); font-size:0.85rem;">16 of 18 phases done</div>
+      <strong>Current phase:</strong> Phase 18 — Final robustness evaluation
+      <div class="progress-bar"><div class="progress-fill" style="width:94%"></div></div>
+      <div style="color:var(--muted); font-size:0.85rem;">17 of 18 phases done</div>
     </div>
 
     <div class="card">
@@ -140,10 +140,10 @@
         <td>Reporting</td>
         <td><span class="badge done">Done</span></td>
       </tr>
-      <tr class="pending">
+      <tr class="done">
         <td>17</td>
         <td>Full integration tests</td>
-        <td><span class="badge pending">Pending</span></td>
+        <td><span class="badge done">Done</span></td>
       </tr>
       <tr class="pending">
         <td>18</td>
@@ -155,7 +155,7 @@
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0;">Files created so far (117)</h2>
+      <h2 style="margin-top:0;">Files created so far (126)</h2>
       <div class="group">
         <h3>(root)/</h3>
         <ul>
@@ -250,6 +250,11 @@
           <li>src/portfolio/portfolio_engine.py</li>
           <li>src/portfolio/run_store.py</li>
           <li>src/reporting/__init__.py</li>
+          <li>src/reporting/charts.py</li>
+          <li>src/reporting/data.py</li>
+          <li>src/reporting/exports.py</li>
+          <li>src/reporting/html_report.py</li>
+          <li>src/reporting/report_engine.py</li>
           <li>src/risk/__init__.py</li>
           <li>src/risk/correlated_exposure.py</li>
           <li>src/risk/engine.py</li>
@@ -298,6 +303,10 @@
           <li>tests/test_position_manager.py</li>
           <li>tests/test_project_structure.py</li>
           <li>tests/test_regime.py</li>
+          <li>tests/test_report_engine.py</li>
+          <li>tests/test_reporting_charts.py</li>
+          <li>tests/test_reporting_data.py</li>
+          <li>tests/test_reporting_exports.py</li>
           <li>tests/test_reproducibility.py</li>
           <li>tests/test_resilience.py</li>
           <li>tests/test_risk_engine.py</li>
@@ -315,7 +324,7 @@
       </div>
     </div>
 
-    <footer>Generated 2026-09-14 17:14 UTC by scripts/generate_progress_report.py</footer>
+    <footer>Generated 2026-09-14 18:05 UTC by scripts/generate_progress_report.py</footer>
   </div>
 </body>
 </html>

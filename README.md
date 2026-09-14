@@ -26,7 +26,7 @@ phase by phase (see Section 40 there); progress so far:
 | 14    | Paper trading                                   | ✅ done |
 | 15    | Risk & kill switch                              | ✅ done |
 | 16    | Reporting                                       | ✅ done |
-| 17    | Full integration tests                          | pending |
+| 17    | Full integration tests                          | ✅ done |
 | 18    | Final robustness evaluation                     | pending |
 
 ## Requirements
@@ -723,6 +723,26 @@ phase will add them, rather than silently doing nothing.
 ```bash
 pytest
 ```
+
+Every phase's own unit tests construct and tear down an isolated
+`Database("sqlite:///:memory:")` (never the real project database) and
+clean up any file they write. `tests/test_full_pipeline_integration.py`
+(Phase 17, CLAUDE.md Section 40) is the exception by necessity: it drives
+the actual CLI end to end — `info` → `validate-data` → `backtest` →
+`optimize` → `walk-forward` → `monte-carlo` → `portfolio` → `paper-trade`
+→ `kill-switch` → `report` — the way a real user would, so it needs a
+real CSV under `data/raw/` (no CLI flag overrides that path) and the
+real `get_default_database()` singleton (redirected to a throwaway
+sqlite file for the duration of the test via `DATABASE_URL`). Every
+fixture that touches something real cleans it up unconditionally
+(`yield` + `finally`), and asserts the final report reflects genuine
+results from every phase rather than "no data yet" placeholders. The
+same file also exercises two things Phases 12-15 only ever tested in
+isolation from each other: that both `MT5Adapter` and
+`GenericRestAdapter` implement `BrokerAdapter`'s complete interface, and
+that a `KillSwitch` trip actually disables a registered broker adapter's
+`place_order()` (and a reset actually re-enables it) — cross-module
+wiring no single phase's own test suite could prove on its own.
 
 ## Live trading safety
 
