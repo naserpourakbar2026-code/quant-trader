@@ -43,7 +43,7 @@ PHASES: list[Phase] = [
     Phase(9, "Walk-forward analysis", "done"),
     Phase(10, "Monte Carlo analysis", "done"),
     Phase(11, "Portfolio engine", "done"),
-    Phase(12, "MT5 broker adapter (code + mocked tests)", "pending"),
+    Phase(12, "MT5 broker adapter (code + mocked tests)", "done"),
     Phase(13, "Generic REST/WebSocket broker adapter", "pending"),
     Phase(14, "Paper trading", "pending"),
     Phase(15, "Risk & kill switch", "pending"),

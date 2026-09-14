@@ -21,7 +21,7 @@ phase by phase (see Section 40 there); progress so far:
 | 9     | Walk-forward                                    | ✅ done |
 | 10    | Monte Carlo                                     | ✅ done |
 | 11    | Portfolio engine                                | ✅ done |
-| 12    | MT5 adapter (code + mocked tests, Windows-only) | pending |
+| 12    | MT5 adapter (code + mocked tests, Windows-only) | ✅ done |
 | 13    | Generic broker API adapter                      | pending |
 | 14    | Paper trading                                   | pending |
 | 15    | Risk & kill switch                              | pending |
@@ -421,6 +421,52 @@ running the single best one.
   combination that matches, reports which had no raw data, and prints
   each survivor's individual metrics, the correlation matrix, and each
   allocation method's weights/metrics/improved-vs-not verdict.
+
+## Broker adapters (Phase 12: MT5)
+
+`src/brokers/base.py` — CLAUDE.md Section 21's abstract `BrokerAdapter`:
+`connect`/`disconnect`, `get_account`/`get_balance`/`get_equity`,
+`get_positions`, `get_symbol_info`, `get_quote`, `place_order`/
+`modify_order`/`cancel_order`/`close_position`, `get_order_status`.
+Strategy/risk/execution code depends on this interface, never on a
+specific broker's SDK — Phase 13's generic REST/WebSocket adapter
+implements the same interface.
+
+Two safety mechanisms live in the base class, shared by every adapter
+(Section 27): `emergency_stop()`/`reset_emergency_stop()` (an in-process
+halt flag checked before any order-sending call) and
+`_ensure_order_allowed()`, which blocks `place_order`/`modify_order`/
+`cancel_order`/`close_position` whenever `environment == "live"` unless
+**both** `LIVE_TRADING=true` and `LIVE_CONFIRMATION=true` are set. A
+`"demo"` connection is never gated by those two flags — no real money is
+at risk there.
+
+`src/brokers/mt5_adapter.py` — `MT5Adapter`, the first implementation.
+**Environment constraint (Section 22): the `MetaTrader5` Python package
+only works on Windows with a running MT5 terminal — it cannot be
+installed or imported here.** It's imported lazily (reusing
+`src.data.mt5_loader.connect()`/`MT5UnavailableError` from Phase 2's data
+ingestion), so this module stays importable and unit-testable on
+Linux/macOS with every `MetaTrader5` call mocked — see
+`tests/test_mt5_adapter.py`, which stubs `sys.modules["MetaTrader5"]`
+with a fake module (namedtuples/namespaces + the real API's constants)
+covering every adapter method: connection lifecycle, account/position/
+symbol/quote mapping, order placement (market and pending, with a
+caller-supplied `client_order_id` mapped deterministically to an MT5
+magic number via CRC32 — never Python's own `hash()`, which isn't stable
+across runs), modify/cancel/close, order status, the emergency-stop halt,
+and the live/demo gating in both directions. **None of this proves the
+real MT5 package behaves identically** — only a real terminal on Windows
+can (Section 22) — these tests only pin down `MT5Adapter`'s own logic
+against whatever `MetaTrader5` hands it back.
+
+`build_from_config()` constructs an `MT5Adapter` from
+`config/brokers.yaml`'s `brokers.mt5` block plus `.env` (`MT5_LOGIN`,
+`MT5_PASSWORD`, `MT5_SERVER`, `MT5_TERMINAL_PATH`) — credentials never
+hard-coded (Sections 22, 24, 42). `brokers.mt5.enabled` is `false` by
+default; connecting for real requires enabling it, running on Windows
+with `requirements-windows.txt` installed and a terminal open, and
+filling in `.env`.
 
 ## CLI
 

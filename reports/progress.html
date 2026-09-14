@@ -50,9 +50,9 @@
     <p class="subtitle">Static snapshot — open this file directly, no server or code execution needed.</p>
 
     <div class="card">
-      <strong>Current phase:</strong> Phase 12 — MT5 broker adapter (code + mocked tests)
-      <div class="progress-bar"><div class="progress-fill" style="width:61%"></div></div>
-      <div style="color:var(--muted); font-size:0.85rem;">11 of 18 phases done</div>
+      <strong>Current phase:</strong> Phase 13 — Generic REST/WebSocket broker adapter
+      <div class="progress-bar"><div class="progress-fill" style="width:67%"></div></div>
+      <div style="color:var(--muted); font-size:0.85rem;">12 of 18 phases done</div>
     </div>
 
     <div class="card">
@@ -115,10 +115,10 @@
         <td>Portfolio engine</td>
         <td><span class="badge done">Done</span></td>
       </tr>
-      <tr class="pending">
+      <tr class="done">
         <td>12</td>
         <td>MT5 broker adapter (code + mocked tests)</td>
-        <td><span class="badge pending">Pending</span></td>
+        <td><span class="badge done">Done</span></td>
       </tr>
       <tr class="pending">
         <td>13</td>
@@ -155,7 +155,7 @@
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0;">Files created so far (90)</h2>
+      <h2 style="margin-top:0;">Files created so far (94)</h2>
       <div class="group">
         <h3>(root)/</h3>
         <ul>
@@ -237,6 +237,9 @@
           <li>src/optimization/__init__.py</li>
           <li>src/optimization/optuna_engine.py</li>
           <li>src/portfolio/__init__.py</li>
+          <li>src/portfolio/models.py</li>
+          <li>src/portfolio/portfolio_engine.py</li>
+          <li>src/portfolio/run_store.py</li>
           <li>src/reporting/__init__.py</li>
           <li>src/risk/__init__.py</li>
           <li>src/strategies/__init__.py</li>
@@ -271,6 +274,7 @@
           <li>tests/test_momentum.py</li>
           <li>tests/test_mt5_loader.py</li>
           <li>tests/test_optuna_engine.py</li>
+          <li>tests/test_portfolio_engine.py</li>
           <li>tests/test_project_structure.py</li>
           <li>tests/test_regime.py</li>
           <li>tests/test_reproducibility.py</li>
@@ -288,7 +292,7 @@
       </div>
     </div>
 
-    <footer>Generated 2026-09-14 16:12 UTC by scripts/generate_progress_report.py</footer>
+    <footer>Generated 2026-09-14 16:20 UTC by scripts/generate_progress_report.py</footer>
   </div>
 </body>
 </html>
