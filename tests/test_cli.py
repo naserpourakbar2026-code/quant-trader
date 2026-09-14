@@ -1,4 +1,4 @@
-from main import build_parser, cmd_download_data, cmd_info, cmd_validate_data
+from main import build_parser, cmd_backtest, cmd_download_data, cmd_info, cmd_validate_data
 
 
 def test_info_command_runs_and_returns_zero(capsys):
@@ -13,10 +13,32 @@ def test_info_command_runs_and_returns_zero(capsys):
 
 def test_pending_commands_return_nonzero_and_do_not_pretend_to_run():
     parser = build_parser()
-    for name in ["backtest", "live", "report"]:
+    for name in ["live", "report"]:
         args = parser.parse_args([name])
         exit_code = args.func(args)
         assert exit_code != 0
+
+
+def test_backtest_command_reports_missing_when_no_raw_file(capsys):
+    """No CSV placed yet under data/raw for this symbol/timeframe -> the
+    combination is skipped (reported, not fabricated), exit code 0."""
+    parser = build_parser()
+    args = parser.parse_args(["backtest", "--strategy", "trend_following", "--symbol", "EURUSD", "--timeframe", "H1"])
+    assert args.func is cmd_backtest
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "Skipped" in out
+    assert "Backtested 0/1" in out
+
+
+def test_backtest_command_no_matching_strategy_reports_and_exits_zero(capsys):
+    parser = build_parser()
+    args = parser.parse_args(["backtest", "--strategy", "not_a_real_strategy"])
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "No enabled strategy" in out
 
 
 def test_download_data_command_reports_missing_when_no_raw_file(capsys):

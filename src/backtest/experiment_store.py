@@ -44,6 +44,7 @@ class ExperimentRecord:
     code_version: str
     python_version: str
     library_versions: dict
+    engine: str = "vectorbt"
     random_seed: int | None = None
 
 
@@ -53,6 +54,7 @@ def save_experiment(record: ExperimentRecord, db: Database | None = None) -> Non
         session.add(
             Experiment(
                 experiment_id=record.experiment_id,
+                engine=record.engine,
                 strategy=record.strategy,
                 symbol=record.symbol,
                 timeframe=record.timeframe,
@@ -74,6 +76,7 @@ def save_experiment(record: ExperimentRecord, db: Database | None = None) -> Non
 def _to_record(row: Experiment) -> ExperimentRecord:
     return ExperimentRecord(
         experiment_id=row.experiment_id,
+        engine=row.engine,
         strategy=row.strategy,
         symbol=row.symbol,
         timeframe=row.timeframe,
@@ -102,11 +105,14 @@ def list_experiments(
     strategy: str | None = None,
     symbol: str | None = None,
     timeframe: str | None = None,
+    engine: str | None = None,
     db: Database | None = None,
 ) -> list[ExperimentRecord]:
     database = db or get_default_database()
     with database.session() as session:
         query = session.query(Experiment)
+        if engine is not None:
+            query = query.filter_by(engine=engine)
         if strategy is not None:
             query = query.filter_by(strategy=strategy)
         if symbol is not None:

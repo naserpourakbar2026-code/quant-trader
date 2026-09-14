@@ -16,7 +16,7 @@ phase by phase (see Section 40 there); progress so far:
 | 4     | Feature engine                                  | ✅ done |
 | 5     | Three strategies                                | ✅ done |
 | 6     | vectorbt research engine                        | ✅ done |
-| 7     | Backtrader validation engine                    | pending |
+| 7     | Backtrader validation engine                    | ✅ done |
 | 8     | Optuna optimization                             | pending |
 | 9     | Walk-forward                                    | pending |
 | 10    | Monte Carlo                                     | pending |
@@ -71,8 +71,11 @@ only needs a `DATABASE_URL` change (CLAUDE.md Section 29). Defaults to
 code calls `get_default_database()` (a lazily-created singleton); tests
 construct their own `Database("sqlite:///:memory:")` so they never touch
 the real project database. Currently holds `experiments`
-(`src/backtest/models.py`) — more tables arrive with the phases that need
-them (backtests, optimization/walk-forward/Monte Carlo results, ...).
+(`src/backtest/models.py`) — one row per vectorbt screening or Backtrader
+validation run, distinguished by an `engine` column ("vectorbt" |
+"backtrader") so the two can be queried and compared side by side. More
+tables arrive with the phases that need them (optimization/walk-forward/
+Monte Carlo results, ...).
 
 ## Data ingestion (Phase 2)
 
@@ -210,6 +213,46 @@ full test suite passes against pandas 3.0.5 / numpy 2.4.6). Separately,
 a `scattermapbox` property `plotly` removed) — the `plotly<6.0` pin is
 load-bearing, not cosmetic.
 
+## Backtrader validation engine (Phase 7)
+
+`src/backtest/backtrader_engine.py` — after vectorbt screens candidates
+cheaply (Phase 6), this re-checks the survivors with genuine event-driven,
+next-bar execution (CLAUDE.md Section 13): orders placed in `next()` fill
+at the *following* bar's open rather than the signal bar's own close, the
+broker can reject an order for insufficient margin, and stop-loss/
+take-profit are real pending child orders Backtrader checks bar-by-bar —
+not a fractional-distance approximation like the vectorbt screen uses.
+The entry-condition logic itself is untouched: `run_validation()` reads
+the *same* `generate_signals_vectorized()` table Phase 5/6 use, so only
+execution realism differs between engines, never "what the strategy
+decided" — `compare_with_screening(screening_metrics, validation_metrics)`
+puts both side by side per Section 13's stated purpose ("catches
+unrealistic results from vectorized backtest assumptions").
+
+Costs: commission from `execution.costs` (same scenarios as Phase 6) plus
+the real spread from the data's own `spread` column (averaged, folded
+into the commission percentage), leverage-based margin via
+`risk.max_leverage`. Persists as an `Experiment` row with `engine:
+"backtrader"` so a screening result and its validation are queryable
+side by side.
+
+⚠️ **Two real bugs found and fixed while building this** (both now
+pinned by regression tests):
+1. Backtrader's `setcommission(leverage=...)`, when `commtype`/`margin`
+   are left at their defaults, silently falls back to legacy
+   stock-like accounting that requires the *full notional* as cash and
+   ignores `leverage` entirely — this alone rejected ~90%+ of orders.
+   Fixed by passing `commtype`/`stocklike=False`/`automargin=1/leverage`
+   explicitly, which is what actually turns leverage into a real margin
+   requirement.
+2. `buy_bracket()`/`sell_bracket()` default their entry leg to a **Limit**
+   order at the signal bar's price, not Market — it can sit unfilled for
+   many bars (the opposite of "next-bar execution"), during which a
+   signal that stays active would keep re-issuing brand-new duplicate
+   entry orders every bar, each needing its own margin, until the account
+   couldn't afford any of them. Fixed by forcing `exectype=bt.Order.Market`
+   and guarding entries on a pending-order check.
+
 ## CLI
 
 ```bash
@@ -218,7 +261,8 @@ python main.py download-data   # ingest historical data (implemented, Phase 2)
 python main.py download-data --symbol EURUSD --timeframe H1
 python main.py validate-data   # data-quality report (implemented, Phase 3)
 python main.py validate-data --symbol EURUSD --timeframe H1
-python main.py backtest        # Phase 7
+python main.py backtest        # vectorbt screen + Backtrader validation (implemented, Phases 6-7)
+python main.py backtest --strategy trend_following --symbol EURUSD --timeframe H1 --scenario stress
 python main.py optimize        # Phase 8
 python main.py walk-forward    # Phase 9
 python main.py monte-carlo     # Phase 10

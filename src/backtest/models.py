@@ -1,9 +1,13 @@
-"""Experiment persistence model (CLAUDE.md Sections 12, 29, 36).
+"""Experiment persistence model (CLAUDE.md Sections 12, 13, 29, 36).
 
-Every vectorbt screening run gets a unique ID and is persisted with:
-experiment_id, strategy, symbol, timeframe, parameters, date_range,
-metrics, data_version, code_version — plus the rest of Section 36's
-reproducibility fields (Python/library versions, random seed).
+Every vectorbt screening run (Phase 6) or Backtrader validation run
+(Phase 7) gets a unique ID and is persisted with: experiment_id, engine,
+strategy, symbol, timeframe, parameters, date_range, metrics,
+data_version, code_version — plus the rest of Section 36's
+reproducibility fields (Python/library versions, random seed). `engine`
+distinguishes the two so a screening result and its Backtrader validation
+can be queried and compared side by side (Section 13's whole point:
+catching unrealistic results from vectorized backtest assumptions).
 """
 from __future__ import annotations
 
@@ -20,6 +24,7 @@ class Experiment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     experiment_id: Mapped[str] = mapped_column(String, unique=True, index=True)
+    engine: Mapped[str] = mapped_column(String, index=True, default="vectorbt")
 
     strategy: Mapped[str] = mapped_column(String, index=True)
     symbol: Mapped[str] = mapped_column(String, index=True)

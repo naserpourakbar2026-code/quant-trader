@@ -44,7 +44,7 @@ def _synthetic_candles(n=150, symbol="EURUSD", timeframe="H1", seed=0):
             "low": low,
             "close": close,
             "tick_volume": 100.0,
-            "spread": 1.5,
+            "spread": 0.00015,  # ~1.5 pips for EURUSD, same price units as OHLC
             "real_volume": float("nan"),
         }
     )[STANDARD_COLUMNS]

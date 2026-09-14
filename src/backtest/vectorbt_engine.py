@@ -137,6 +137,7 @@ def run_screening(
         save_experiment(
             ExperimentRecord(
                 experiment_id=experiment_id,
+                engine="vectorbt",
                 strategy=strategy_family,
                 symbol=symbol,
                 timeframe=timeframe,

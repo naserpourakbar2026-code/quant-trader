@@ -50,9 +50,9 @@
     <p class="subtitle">Static snapshot — open this file directly, no server or code execution needed.</p>
 
     <div class="card">
-      <strong>Current phase:</strong> Phase 7 — Backtrader validation engine
-      <div class="progress-bar"><div class="progress-fill" style="width:33%"></div></div>
-      <div style="color:var(--muted); font-size:0.85rem;">6 of 18 phases done</div>
+      <strong>Current phase:</strong> Phase 8 — Optuna optimization
+      <div class="progress-bar"><div class="progress-fill" style="width:39%"></div></div>
+      <div style="color:var(--muted); font-size:0.85rem;">7 of 18 phases done</div>
     </div>
 
     <div class="card">
@@ -90,10 +90,10 @@
         <td>vectorbt research engine</td>
         <td><span class="badge done">Done</span></td>
       </tr>
-      <tr class="pending">
+      <tr class="done">
         <td>7</td>
         <td>Backtrader validation engine</td>
-        <td><span class="badge pending">Pending</span></td>
+        <td><span class="badge done">Done</span></td>
       </tr>
       <tr class="pending">
         <td>8</td>
@@ -155,7 +155,7 @@
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0;">Files created so far (68)</h2>
+      <h2 style="margin-top:0;">Files created so far (78)</h2>
       <div class="group">
         <h3>(root)/</h3>
         <ul>
@@ -209,10 +209,15 @@
         <ul>
           <li>src/__init__.py</li>
           <li>src/backtest/__init__.py</li>
+          <li>src/backtest/experiment_store.py</li>
+          <li>src/backtest/models.py</li>
+          <li>src/backtest/vectorbt_engine.py</li>
           <li>src/brokers/__init__.py</li>
           <li>src/core/__init__.py</li>
           <li>src/core/config.py</li>
+          <li>src/core/db.py</li>
           <li>src/core/logging.py</li>
+          <li>src/core/reproducibility.py</li>
           <li>src/data/__init__.py</li>
           <li>src/data/csv_loader.py</li>
           <li>src/data/ingestion.py</li>
@@ -247,6 +252,8 @@
           <li>tests/test_config.py</li>
           <li>tests/test_csv_loader.py</li>
           <li>tests/test_data_schema.py</li>
+          <li>tests/test_db.py</li>
+          <li>tests/test_experiment_store.py</li>
           <li>tests/test_feature_engine.py</li>
           <li>tests/test_indicators.py</li>
           <li>tests/test_ingestion.py</li>
@@ -255,18 +262,21 @@
           <li>tests/test_mt5_loader.py</li>
           <li>tests/test_project_structure.py</li>
           <li>tests/test_regime.py</li>
+          <li>tests/test_reproducibility.py</li>
           <li>tests/test_stops.py</li>
           <li>tests/test_strategies_integration.py</li>
           <li>tests/test_strategy_base.py</li>
           <li>tests/test_strategy_registry.py</li>
+          <li>tests/test_strategy_vectorized_consistency.py</li>
           <li>tests/test_targets.py</li>
           <li>tests/test_trend_following.py</li>
           <li>tests/test_validation.py</li>
+          <li>tests/test_vectorbt_engine.py</li>
         </ul>
       </div>
     </div>
 
-    <footer>Generated 2026-09-14 10:35 UTC by scripts/generate_progress_report.py</footer>
+    <footer>Generated 2026-09-14 10:55 UTC by scripts/generate_progress_report.py</footer>
   </div>
 </body>
 </html>
