@@ -172,10 +172,18 @@ class AppConfig(BaseModel):
         return v
 
 
+class StrategyDefinition(BaseModel):
+    family: str
+    enabled: bool = True
+    symbols: list[str] = Field(default_factory=list)
+    timeframes: list[str] = Field(default_factory=list)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
 class StrategiesConfig(BaseModel):
     stop_loss_types: list[str]
     take_profit_ratios: list[float]
-    strategies: dict[str, Any] = Field(default_factory=dict)
+    strategies: dict[str, StrategyDefinition] = Field(default_factory=dict)
 
 
 class BrokerEntryConfig(BaseModel):

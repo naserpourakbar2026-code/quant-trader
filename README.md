@@ -14,7 +14,7 @@ phase by phase (see Section 40 there); progress so far:
 | 2     | Data ingestion                                  | ✅ done |
 | 3     | Data validation                                 | ✅ done |
 | 4     | Feature engine                                  | ✅ done |
-| 5     | Three strategies                                | pending |
+| 5     | Three strategies                                | ✅ done |
 | 6     | vectorbt research engine                        | pending |
 | 7     | Backtrader validation engine                    | pending |
 | 8     | Optuna optimization                             | pending |
@@ -55,8 +55,8 @@ All trading-relevant values live in YAML, never hard-coded:
 
 - `config/settings.yaml` — capital, risk limits, symbols/timeframes, execution
   scenarios, logging/paths.
-- `config/strategies.yaml` — strategy registry and parameters (populated in
-  Phase 5).
+- `config/strategies.yaml` — strategy registry and parameters for the three
+  families below (Phase 5).
 - `config/brokers.yaml` — non-secret broker connection settings. Secrets
   (API keys, MT5 credentials) go in `.env`, never in this file or in source.
 
@@ -121,6 +121,42 @@ brief's CLI list has none for it):
 All periods/thresholds live under `features:` in `config/settings.yaml`
 (`FeatureParams.from_settings()`) and can be overridden per call — e.g. for
 Optuna sweeps in Phase 8.
+
+## Strategies (Phase 5)
+
+`src/strategies/` implements three independent families (CLAUDE.md
+Section 5), each on the standard interface from Section 6
+(`generate_signal`, `calculate_stop_loss`, `calculate_take_profit`,
+`calculate_position_size`, `validate_signal` — see `src/strategies/base.py`):
+
+- **`trend_following.py`** — trades a Donchian-style breakout, but only in
+  the direction of an already objectively-classified trend
+  (`trend_regime` from Phase 4), with a volatility filter against
+  breakouts during `low_vol`.
+- **`mean_reversion.py`** — fades a Bollinger Band extreme confirmed by
+  RSI, but refuses to fade the direction of a *strong* trend (Section 5B's
+  "avoid aggressively trading against strong trends"); its take-profit is
+  the reversion target (the Bollinger middle band) rather than a fixed
+  R-multiple.
+- **`momentum.py`** — a genuine multi-factor score (momentum, breakout
+  strength, trend alignment), each with a stated justification; tick
+  volume is used only as a capped ±20% confirmation multiplier, never a
+  standalone signal, since retail-forex tick volume is a price-change
+  count, not real traded volume.
+
+Stop-loss types (`src/strategies/stops.py`: ATR, swing, fixed %,
+volatility-scaled ATR) and take-profit types (`src/strategies/targets.py`:
+R-multiple, ATR target, mean-reversion target) are implemented as pluggable
+functions per CLAUDE.md Sections 9-10 — *which* one performs best is an
+empirical question for Backtrader validation (Phase 7) and Optuna (Phase
+8), not decided here. `create_strategy(family, params)` in
+`src/strategies/__init__.py` instantiates any of the three by name from
+`config/strategies.yaml`.
+
+`calculate_position_size()`'s formula (equity × risk% ÷ stop distance)
+assumes the traded pair's quote currency equals the account currency — a
+stated simplification until real broker pip-value/contract-size
+specifications are available from a connected broker adapter (Phase 12/13).
 
 ## CLI
 

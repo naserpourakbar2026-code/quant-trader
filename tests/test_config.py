@@ -116,10 +116,15 @@ def test_load_settings_loads_features_config():
     assert settings.features.ema_slow_period > settings.features.ema_fast_period
 
 
-def test_load_strategies_returns_empty_registry_before_phase5():
+def test_load_strategies_returns_three_strategy_families():
     strategies = load_strategies()
     assert isinstance(strategies, StrategiesConfig)
-    assert strategies.strategies == {}
+    assert set(strategies.strategies) == {"trend_following", "mean_reversion", "momentum_multi_factor"}
+    for name, definition in strategies.strategies.items():
+        assert definition.family == name
+        assert definition.enabled is True
+        assert definition.symbols
+        assert definition.timeframes
     assert "atr" in strategies.stop_loss_types
 
 

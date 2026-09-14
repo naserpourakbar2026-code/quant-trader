@@ -1,22 +1,49 @@
-# Strategy definitions and their tunable parameters.
+# Strategy definitions and their tunable parameters (CLAUDE.md Section 5).
 #
-# Populated in Phase 5 (strategy implementations) and refined by Optuna in
-# Phase 8. Left as an empty registry for now — no strategy exists yet, so
-# there is nothing real to configure. Only parameters with a logical
-# economic/trading justification belong here (see CLAUDE.md Section 14).
+# Three independent strategy families, implemented in src/strategies/.
+# `enabled: true` here only means "available to run" — it is not a claim
+# that the strategy is profitable; that is decided empirically starting
+# in Phase 6 (vectorbt screening) and Phase 7 (Backtrader validation), and
+# only trusted after Phase 9's walk-forward out-of-sample test.
+#
+# Parameter periods (ema/atr/bollinger/rsi/donchian) intentionally match
+# config/settings.yaml's `features:` block, since strategies consume that
+# same shared feature set. Only parameters with a logical economic/trading
+# justification are exposed for later Optuna sweeps (Phase 8, Section 14).
 
 stop_loss_types: [atr, swing, fixed_pct, volatility]
 take_profit_ratios: [1.0, 1.5, 2.0, 3.0]   # plus atr_target / trailing / break_even / partial, handled in code
 
-strategies: {}
-# Example shape to be filled in during Phase 5:
-# strategies:
-#   trend_breakout:
-#     family: trend_following
-#     enabled: false
-#     symbols: [EURUSD, GBPUSD]
-#     timeframes: [H1, H4]
-#     parameters:
-#       ema_period: 50
-#       atr_period: 14
-#       donchian_period: 20
+strategies:
+  trend_following:
+    family: trend_following
+    enabled: true
+    symbols: [EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, EURJPY, GBPJPY]
+    timeframes: [M15, H1, H4]
+    parameters:
+      atr_stop_multiplier: 2.0
+      take_profit_r_multiple: 2.0
+      require_non_low_vol: true
+
+  mean_reversion:
+    family: mean_reversion
+    enabled: true
+    symbols: [EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, EURJPY, GBPJPY]
+    timeframes: [M15, H1, H4]
+    parameters:
+      rsi_oversold: 30.0
+      rsi_overbought: 70.0
+      atr_stop_multiplier: 1.5
+
+  momentum_multi_factor:
+    family: momentum_multi_factor
+    enabled: true
+    symbols: [EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, EURJPY, GBPJPY]
+    timeframes: [M15, H1, H4]
+    parameters:
+      momentum_normalizer_pct: 1.0
+      breakout_normalizer_atr: 1.0
+      entry_threshold: 0.5
+      volume_lookback: 20
+      swing_lookback: 10
+      take_profit_r_multiple: 2.0
