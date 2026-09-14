@@ -50,9 +50,9 @@
     <p class="subtitle">Static snapshot — open this file directly, no server or code execution needed.</p>
 
     <div class="card">
-      <strong>Current phase:</strong> Phase 14 — Paper trading
-      <div class="progress-bar"><div class="progress-fill" style="width:72%"></div></div>
-      <div style="color:var(--muted); font-size:0.85rem;">13 of 18 phases done</div>
+      <strong>Current phase:</strong> Phase 15 — Risk &amp; kill switch
+      <div class="progress-bar"><div class="progress-fill" style="width:78%"></div></div>
+      <div style="color:var(--muted); font-size:0.85rem;">14 of 18 phases done</div>
     </div>
 
     <div class="card">
@@ -125,10 +125,10 @@
         <td>Generic REST/WebSocket broker adapter</td>
         <td><span class="badge done">Done</span></td>
       </tr>
-      <tr class="pending">
+      <tr class="done">
         <td>14</td>
         <td>Paper trading</td>
-        <td><span class="badge pending">Pending</span></td>
+        <td><span class="badge done">Done</span></td>
       </tr>
       <tr class="pending">
         <td>15</td>
@@ -155,7 +155,7 @@
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0;">Files created so far (97)</h2>
+      <h2 style="margin-top:0;">Files created so far (102)</h2>
       <div class="group">
         <h3>(root)/</h3>
         <ul>
@@ -215,7 +215,9 @@
           <li>src/backtest/vectorbt_engine.py</li>
           <li>src/brokers/__init__.py</li>
           <li>src/brokers/base.py</li>
+          <li>src/brokers/generic_rest_adapter.py</li>
           <li>src/brokers/mt5_adapter.py</li>
+          <li>src/brokers/resilience.py</li>
           <li>src/core/__init__.py</li>
           <li>src/core/config.py</li>
           <li>src/core/db.py</li>
@@ -262,6 +264,7 @@
         <ul>
           <li>tests/__init__.py</li>
           <li>tests/test_backtrader_engine.py</li>
+          <li>tests/test_broker_base.py</li>
           <li>tests/test_cli.py</li>
           <li>tests/test_config.py</li>
           <li>tests/test_csv_loader.py</li>
@@ -269,6 +272,7 @@
           <li>tests/test_db.py</li>
           <li>tests/test_experiment_store.py</li>
           <li>tests/test_feature_engine.py</li>
+          <li>tests/test_generic_rest_adapter.py</li>
           <li>tests/test_indicators.py</li>
           <li>tests/test_ingestion.py</li>
           <li>tests/test_mc_engine.py</li>
@@ -281,6 +285,7 @@
           <li>tests/test_project_structure.py</li>
           <li>tests/test_regime.py</li>
           <li>tests/test_reproducibility.py</li>
+          <li>tests/test_resilience.py</li>
           <li>tests/test_stops.py</li>
           <li>tests/test_strategies_integration.py</li>
           <li>tests/test_strategy_base.py</li>
@@ -295,7 +300,7 @@
       </div>
     </div>
 
-    <footer>Generated 2026-09-14 16:28 UTC by scripts/generate_progress_report.py</footer>
+    <footer>Generated 2026-09-14 16:44 UTC by scripts/generate_progress_report.py</footer>
   </div>
 </body>
 </html>

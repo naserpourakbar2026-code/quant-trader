@@ -17,6 +17,7 @@ from src.core.logging import configure_logging, get_system_logger
 from src.data.csv_loader import load_csv
 from src.data.ingestion import run_download
 from src.data.validation import run_validation
+from src.execution.paper_trading import run_paper_trading_session
 from src.montecarlo.mc_engine import run_monte_carlo
 from src.optimization.optuna_engine import assess_parameter_stability, run_optimization
 from src.portfolio.portfolio_engine import run_portfolio_analysis
@@ -24,7 +25,6 @@ from src.walkforward.wfa_engine import run_walk_forward
 
 # command -> (implemented, scheduled phase)
 COMMAND_PHASES: dict[str, tuple[bool, int]] = {
-    "paper-trade": (False, 14),
     "live": (False, 14),
     "report": (False, 16),
 }
@@ -362,6 +362,36 @@ def cmd_portfolio(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_paper_trade(args: argparse.Namespace) -> int:
+    """Replay historical candles bar-by-bar through the full Market Data
+    -> Strategy -> Risk Engine -> Virtual Order -> Execution Simulator
+    -> Position Manager -> PnL pipeline (Phase 14, CLAUDE.md Section 26).
+    There is no live feed in this sandbox; this is always a simulated
+    session over historical data, never a real order."""
+    strategies_cfg = load_strategies()
+    definition = strategies_cfg.strategies.get(args.strategy)
+    if definition is None:
+        print(f"Unknown strategy {args.strategy!r}; expected one of {sorted(strategies_cfg.strategies)}", file=sys.stderr)
+        return 1
+
+    try:
+        raw_df = load_csv(args.symbol, args.timeframe)
+    except FileNotFoundError as exc:
+        print(str(exc))
+        return 0
+
+    try:
+        result = run_paper_trading_session(
+            args.strategy, args.symbol, args.timeframe, raw_df, scenario=args.scenario, initial_capital=args.capital,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return 0
+
+    print(result.to_text())
+    return 0
+
+
 def _not_implemented(name: str, phase: int) -> int:
     logger = get_system_logger()
     message = (
@@ -462,6 +492,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--min-trades", type=int, dest="min_trades", help="Exclude combinations with fewer trades (default: portfolio.min_trades)"
     )
     portfolio_parser.set_defaults(func=cmd_portfolio)
+
+    paper_trade_parser = subparsers.add_parser(
+        "paper-trade", help="Simulate a strategy bar-by-bar over historical data (Phase 14)"
+    )
+    paper_trade_parser.add_argument("--strategy", required=True, help="Strategy family (see config/strategies.yaml)")
+    paper_trade_parser.add_argument("--symbol", required=True, help="Symbol to simulate")
+    paper_trade_parser.add_argument("--timeframe", required=True, help="Timeframe to simulate")
+    paper_trade_parser.add_argument("--scenario", help="optimistic|realistic|stress (default: execution.default_scenario)")
+    paper_trade_parser.add_argument("--capital", type=float, help="Initial capital override (default: account.initial_capital)")
+    paper_trade_parser.set_defaults(func=cmd_paper_trade)
 
     for name, (_implemented, phase) in COMMAND_PHASES.items():
         sub = subparsers.add_parser(name, help=f"(pending — Phase {phase})")

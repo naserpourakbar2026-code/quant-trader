@@ -23,7 +23,7 @@ phase by phase (see Section 40 there); progress so far:
 | 11    | Portfolio engine                                | ✅ done |
 | 12    | MT5 adapter (code + mocked tests, Windows-only) | ✅ done |
 | 13    | Generic broker API adapter                      | ✅ done |
-| 14    | Paper trading                                   | pending |
+| 14    | Paper trading                                   | ✅ done |
 | 15    | Risk & kill switch                              | pending |
 | 16    | Reporting                                       | pending |
 | 17    | Full integration tests                          | pending |
@@ -84,7 +84,14 @@ resulting outcome-distribution summary. And `portfolio_runs`
 (`src/portfolio/models.py`) — one row per portfolio analysis run (Phase
 11): the screened components, their pairwise correlation, and each
 allocation method's weights/metrics/verdict versus the best single
-component. More tables arrive with the phases that need them.
+component. And `paper_sessions` / `paper_trades`
+(`src/execution/models.py`, Phase 14) — one session summary row plus one
+row per *closed* trade, the latter holding exactly CLAUDE.md Section
+28's trade-log field list (timestamp, symbol, strategy, signal, entry,
+SL, TP, size, risk, spread, slippage, exit, PnL, R multiple, reason) —
+the first phase anything gets logged at that per-trade granularity
+(Phases 6-11's `experiments` table only ever stored aggregate metrics).
+More tables arrive with the phases that need them.
 
 ## Data ingestion (Phase 2)
 
@@ -513,8 +520,10 @@ reuse it) plus this adapter's own request path:
 (Section 23's other half): it proves the adapter can open, subscribe on,
 and consume a streaming connection generically (an injectable connector,
 default `websockets.connect`) — it is **not** wired into `get_quote()` or
-anywhere else; turning a quote stream into what paper trading (Phase 14)
-consumes is that phase's job.
+anywhere else. Phase 14's paper trading, as built, replays historical
+candles rather than a broker's live feed (there is no live connection in
+this sandbox); wiring a real quote stream into a live/paper session that
+talks to an actual broker is future work, not something Phase 14 does.
 
 `tests/test_generic_rest_adapter.py` (33 tests) stubs `requests.Session`
 with a fake answering from a canned response table, and the WebSocket
@@ -525,6 +534,72 @@ since none is chosen yet. `build_from_config()` wires
 `config/brokers.yaml`'s `brokers.generic_rest` block plus `.env`
 (`BROKER_API_KEY`/`BROKER_API_SECRET`/`BROKER_ACCOUNT_ID`) into an
 adapter instance; `brokers.generic_rest.enabled` is `false` by default.
+
+## Paper trading (Phase 14)
+
+CLAUDE.md Section 26's pipeline, implemented exactly in this order:
+
+```
+Market Data -> Strategy -> Risk Engine -> Virtual Order
+  -> Execution Simulator -> Position Manager -> PnL
+```
+
+`src/execution/paper_trading.py`'s `run_paper_trading_session()` replays
+one strategy/symbol/timeframe's historical candles bar by bar as if they
+were arriving live — there is no live broker feed in this sandbox (or
+until Phases 12/13's adapters are actually connected in production), so
+this is always a simulated session over historical data, never a real
+order.
+
+- **One bar of execution delay, deliberately** (Section 11): a signal
+  decided from bar *i*'s close is only filled at bar *i+1*'s open —
+  matching Backtrader's own next-bar-execution model (Phase 7), never
+  the same bar's close a real broker could never fill at.
+- **`src/risk/engine.py`'s `RiskEngine`** sits between every signal and
+  every virtual order: the max-drawdown kill switch (checked every bar,
+  never resets itself once tripped), the consecutive-loss cooldown,
+  daily/weekly loss and trade-count limits, max open positions, and an
+  approximate margin check (notional / `max_leverage` against equity *
+  `max_margin_usage` — true margin needs broker-specific contract size,
+  only available once a broker is connected, Section 8). It only
+  *evaluates* a size `BaseStrategy.calculate_position_size()` already
+  computed — sizing has exactly one formula in the whole codebase.
+  `max_correlated_exposure` is deliberately not implemented here: it's a
+  cross-*symbol* concept, but this session (like every other engine in
+  this codebase) is scoped to one symbol — there's nothing else in scope
+  to be correlated with. A portfolio-level exposure check belongs to a
+  multi-symbol orchestrator that doesn't exist yet, reusing Phase 11's
+  correlation machinery when it does.
+- **`src/execution/simulator.py`'s `ExecutionSimulator`** applies
+  slippage (always against the trader, direction-aware) and a commission
+  that folds in the bar's own real `spread` value the same way
+  `src.backtest.backtrader_engine` does, under the same
+  `execution.costs[scenario]` every other engine uses.
+- **`src/execution/position_manager.py`'s `PositionManager`** detects
+  intrabar stop-loss/take-profit touches from a bar's high/low (assuming
+  the stop was touched first if both would be in the same bar — the
+  conservative, worse-for-the-trader assumption, since there's no
+  intrabar tick data to know the true order) and produces `PaperTrade`
+  records with exactly Section 28's trade-log fields.
+- At most **one open position per session** at a time (matching the
+  vectorbt/Backtrader engines' own non-stacking convention); a signal
+  reversal closes the old position and opens the new one at the same
+  bar's open. A position still open when the data runs out is reported
+  as still open, mark-to-market — never force-closed into a synthetic
+  trade that didn't happen.
+- `python main.py paper-trade --strategy --symbol --timeframe
+  [--scenario] [--capital]` prints the full session report: final
+  equity, every closed trade, win rate, total PnL, rejected-signal count,
+  and whether the kill switch tripped.
+
+The main efficiency choice worth calling out: `generate_signals_vectorized()`
+is computed **once** for the whole series up front (exactly the table
+`run_screening()` reads) rather than re-calling `generate_signal()` on a
+growing slice every bar — since that function is purely causal (rolling
+windows, never a future row), reading row *i* of one whole-series
+computation is provably identical to recomputing it fresh on
+`df.iloc[:i+1]` every iteration, just without turning the loop from O(n)
+into O(n²) for zero behavioral difference.
 
 ## CLI
 
@@ -544,8 +619,9 @@ python main.py monte-carlo --strategy trend_following --symbol EURUSD --timefram
 python main.py monte-carlo --strategy trend_following --symbol EURUSD --timeframe H1 --simulations 5000 --scenario stress
 python main.py portfolio        # implemented, Phase 11 -- all enabled combinations
 python main.py portfolio --timeframe H1 --top-n 5 --min-trades 20
-python main.py paper-trade     # Phase 14
-python main.py live            # Phase 14 (requires LIVE_TRADING=true AND LIVE_CONFIRMATION=true)
+python main.py paper-trade --strategy trend_following --symbol EURUSD --timeframe H1  # implemented, Phase 14
+python main.py paper-trade --strategy trend_following --symbol EURUSD --timeframe H1 --capital 5000 --scenario stress
+python main.py live            # not yet implemented (requires LIVE_TRADING=true AND LIVE_CONFIRMATION=true)
 python main.py report          # Phase 16
 ```
 

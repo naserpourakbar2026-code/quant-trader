@@ -7,6 +7,7 @@ from main import (
     cmd_info,
     cmd_monte_carlo,
     cmd_optimize,
+    cmd_paper_trade,
     cmd_portfolio,
     cmd_validate_data,
     cmd_walk_forward,
@@ -181,3 +182,32 @@ def test_portfolio_command_no_matching_strategy_reports_and_exits_zero(capsys):
     assert exit_code == 0
     out = capsys.readouterr().out
     assert "No enabled strategy" in out
+
+
+def test_paper_trade_command_reports_missing_when_no_raw_file(capsys):
+    parser = build_parser()
+    args = parser.parse_args(
+        ["paper-trade", "--strategy", "trend_following", "--symbol", "EURUSD", "--timeframe", "H1"]
+    )
+    assert args.func is cmd_paper_trade
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "No raw CSV found" in out
+
+
+def test_paper_trade_command_rejects_unknown_strategy(capsys):
+    parser = build_parser()
+    args = parser.parse_args(
+        ["paper-trade", "--strategy", "not_a_real_strategy", "--symbol", "EURUSD", "--timeframe", "H1"]
+    )
+    exit_code = args.func(args)
+    assert exit_code == 1
+    err = capsys.readouterr().err
+    assert "Unknown strategy" in err
+
+
+def test_paper_trade_command_requires_strategy_symbol_timeframe():
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["paper-trade", "--strategy", "trend_following"])
