@@ -421,6 +421,12 @@ Charts: Equity Curve, Drawdown, Monthly Returns, Rolling Sharpe, Trade
 Distribution, Parameter Heatmap, Walk-Forward Performance, Monte Carlo
 Distribution, Strategy Correlation.
 
+> **User preference (added post-Phase-1):** the primary deliverable of the
+> reporting phase must be a self-contained, pre-rendered HTML file the user
+> can open directly in a browser — no server, no notebook, no command
+> needing to be run to see results. `python main.py report` generates this
+> file; opening it is enough to view outcomes.
+
 ---
 
 ## 31. Final Robustness Score (0–100)

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>quant-trader — progress</title>
+<style>
+  :root {
+    --bg: #f7f7f8; --fg: #1a1a1a; --muted: #6b7280; --card: #ffffff;
+    --border: #e5e7eb; --accent: #2563eb; --done: #16a34a; --pending: #d97706;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111318; --fg: #e5e7eb; --muted: #9ca3af; --card: #1a1d24;
+      --border: #2a2e37; --accent: #60a5fa; --done: #4ade80; --pending: #fbbf24; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-top: 0; margin-bottom: 24px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .progress-bar {
+    height: 10px; border-radius: 6px; background: var(--border); overflow: hidden; margin: 12px 0;
+  }
+  .progress-fill { height: 100%; background: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  tr.done td { color: var(--fg); }
+  tr.pending td { color: var(--muted); }
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+  }
+  .badge.done { background: rgba(22,163,74,0.15); color: var(--done); }
+  .badge.pending { background: rgba(217,119,6,0.15); color: var(--pending); }
+  .group { margin-bottom: 14px; }
+  .group h3 { margin: 0 0 4px; font-size: 0.95rem; color: var(--accent); }
+  ul { margin: 0; padding-left: 20px; columns: 2; }
+  li { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; }
+  footer { color: var(--muted); font-size: 0.8rem; text-align: center; margin-top: 24px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>quant-trader — build progress</h1>
+    <p class="subtitle">Static snapshot — open this file directly, no server or code execution needed.</p>
+
+    <div class="card">
+      <strong>Current phase:</strong> Phase 2 — Data ingestion
+      <div class="progress-bar"><div class="progress-fill" style="width:6%"></div></div>
+      <div style="color:var(--muted); font-size:0.85rem;">1 of 18 phases done</div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Phases</h2>
+      <table>
+        <thead><tr><th>#</th><th>Phase</th><th>Status</th></tr></thead>
+        <tbody>
+      <tr class="done">
+        <td>1</td>
+        <td>Architecture + environment setup</td>
+        <td><span class="badge done">Done</span></td>
+      </tr>
+      <tr class="pending">
+        <td>2</td>
+        <td>Data ingestion</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>3</td>
+        <td>Data validation</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>4</td>
+        <td>Feature engine</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>5</td>
+        <td>Three strategies</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>6</td>
+        <td>vectorbt research engine</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>7</td>
+        <td>Backtrader validation engine</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>8</td>
+        <td>Optuna optimization</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>9</td>
+        <td>Walk-forward analysis</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>10</td>
+        <td>Monte Carlo analysis</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>11</td>
+        <td>Portfolio engine</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>12</td>
+        <td>MT5 broker adapter (code + mocked tests)</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>13</td>
+        <td>Generic REST/WebSocket broker adapter</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>14</td>
+        <td>Paper trading</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>15</td>
+        <td>Risk &amp; kill switch</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>16</td>
+        <td>Reporting</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>17</td>
+        <td>Full integration tests</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+      <tr class="pending">
+        <td>18</td>
+        <td>Final robustness evaluation</td>
+        <td><span class="badge pending">Pending</span></td>
+      </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Files created so far (36)</h2>
+      <div class="group">
+        <h3>(root)/</h3>
+        <ul>
+          <li>.env.example</li>
+          <li>.gitignore</li>
+          <li>CLAUDE.md</li>
+          <li>README.md</li>
+          <li>main.py</li>
+          <li>pyproject.toml</li>
+          <li>requirements-windows.txt</li>
+          <li>requirements.txt</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3>config/</h3>
+        <ul>
+          <li>config/brokers.yaml</li>
+          <li>config/settings.yaml</li>
+          <li>config/strategies.yaml</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3>data/</h3>
+        <ul>
+          <li>data/cache/.gitkeep</li>
+          <li>data/processed/.gitkeep</li>
+          <li>data/raw/.gitkeep</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3>logs/</h3>
+        <ul>
+          <li>logs/.gitkeep</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3>reports/</h3>
+        <ul>
+          <li>reports/.gitkeep</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3>src/</h3>
+        <ul>
+          <li>src/__init__.py</li>
+          <li>src/backtest/__init__.py</li>
+          <li>src/brokers/__init__.py</li>
+          <li>src/core/__init__.py</li>
+          <li>src/core/config.py</li>
+          <li>src/core/logging.py</li>
+          <li>src/data/__init__.py</li>
+          <li>src/execution/__init__.py</li>
+          <li>src/features/__init__.py</li>
+          <li>src/montecarlo/__init__.py</li>
+          <li>src/optimization/__init__.py</li>
+          <li>src/portfolio/__init__.py</li>
+          <li>src/reporting/__init__.py</li>
+          <li>src/risk/__init__.py</li>
+          <li>src/strategies/__init__.py</li>
+          <li>src/walkforward/__init__.py</li>
+        </ul>
+      </div>
+      <div class="group">
+        <h3>tests/</h3>
+        <ul>
+          <li>tests/__init__.py</li>
+          <li>tests/test_cli.py</li>
+          <li>tests/test_config.py</li>
+          <li>tests/test_project_structure.py</li>
+        </ul>
+      </div>
+    </div>
+
+    <footer>Generated 2026-09-14 09:32 UTC by scripts/generate_progress_report.py</footer>
+  </div>
+</body>
+</html>

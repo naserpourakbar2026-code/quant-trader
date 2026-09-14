@@ -29,6 +29,7 @@ logs/*
 
 reports/*
 !reports/.gitkeep
+!reports/progress.html
 
 *.db
 *.sqlite
