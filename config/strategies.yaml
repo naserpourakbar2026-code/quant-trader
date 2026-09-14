@@ -24,6 +24,15 @@ strategies:
       atr_stop_multiplier: 2.0
       take_profit_r_multiple: 2.0
       require_non_low_vol: true
+    # Phase 8 (Optuna): breakout period + stop/TP multipliers, exactly
+    # Section 14's example list for a breakout strategy. donchian_period
+    # is a feature-level param (config/settings.yaml `features:`) — the
+    # optimizer routes each suggested param to the feature engine or the
+    # strategy's own params based on where its name is actually defined.
+    optimization_space:
+      donchian_period: {type: int, low: 10, high: 40}
+      atr_stop_multiplier: {type: float, low: 1.0, high: 3.0}
+      take_profit_r_multiple: {type: float, low: 1.0, high: 3.0}
 
   mean_reversion:
     family: mean_reversion
@@ -34,6 +43,12 @@ strategies:
       rsi_oversold: 30.0
       rsi_overbought: 70.0
       atr_stop_multiplier: 1.5
+    # Bollinger period/deviation + RSI thresholds, per Section 14.
+    optimization_space:
+      bollinger_period: {type: int, low: 10, high: 40}
+      bollinger_std: {type: float, low: 1.5, high: 3.0}
+      rsi_oversold: {type: float, low: 15.0, high: 35.0}
+      rsi_overbought: {type: float, low: 65.0, high: 85.0}
 
   momentum_multi_factor:
     family: momentum_multi_factor
@@ -47,3 +62,8 @@ strategies:
       volume_lookback: 20
       swing_lookback: 10
       take_profit_r_multiple: 2.0
+    # Momentum period + entry threshold + TP multiple, per Section 14.
+    optimization_space:
+      momentum_period: {type: int, low: 5, high: 30}
+      entry_threshold: {type: float, low: 0.3, high: 0.8}
+      take_profit_r_multiple: {type: float, low: 1.0, high: 3.0}

@@ -17,7 +17,7 @@ phase by phase (see Section 40 there); progress so far:
 | 5     | Three strategies                                | ✅ done |
 | 6     | vectorbt research engine                        | ✅ done |
 | 7     | Backtrader validation engine                    | ✅ done |
-| 8     | Optuna optimization                             | pending |
+| 8     | Optuna optimization                             | ✅ done |
 | 9     | Walk-forward                                    | pending |
 | 10    | Monte Carlo                                     | pending |
 | 11    | Portfolio engine                                | pending |
@@ -253,6 +253,39 @@ pinned by regression tests):
    couldn't afford any of them. Fixed by forcing `exectype=bt.Order.Market`
    and guarding entries on a pending-order check.
 
+## Optuna optimization (Phase 8)
+
+`src/optimization/optuna_engine.py` — searches only the parameters listed
+in each strategy's `optimization_space` (`config/strategies.yaml`): a
+small, economically-justified set per CLAUDE.md Section 14 (breakout
+period + stop/TP multipliers for trend-following; Bollinger period/
+deviation + RSI thresholds for mean reversion; momentum period + entry
+threshold + TP multiple for the multi-factor strategy) — never "dozens of
+parameters at once". Each trial is evaluated via Phase 6's vectorbt
+screen, so the search reads the exact same `generate_signals_vectorized()`
+computation live/paper trading and Backtrader validation do.
+
+- `composite_objective()` implements Section 14's own formula — Profit
+  Factor + Sharpe + Sortino + Expectancy, penalized by `|max_drawdown|`
+  and a shortfall below `optimization.min_trades` — with weights in
+  `config/settings.yaml`'s `optimization:` block (stated, adjustable
+  defaults, not a claim of optimality, same pattern as the cost-scenario
+  placeholders in Phase 6).
+- `run_optimization()` runs an Optuna TPE-sampler study (seeded for
+  reproducibility — Section 36) and persists only the *best* trial as an
+  `Experiment` with `engine: "optuna"` — individual trials aren't
+  persisted (they'd flood the table for no benefit).
+- `assess_parameter_stability()` — Section 16's "never select an isolated
+  spike": after the search, perturbs each tunable parameter by one step
+  and re-scores; a stable region's neighbors score nearly as well as the
+  best point, an isolated spike collapses on its neighbors. Done once,
+  post-hoc (checking every trial's neighborhood during the search itself
+  would multiply the total cost by the neighborhood size for no benefit).
+- `python main.py optimize` requires an explicit `--strategy --symbol
+  --timeframe` (never a broad default sweep — a multi-trial search isn't
+  something to run accidentally across every combination) and prints the
+  best parameters, objective, key metrics, and the stability score.
+
 ## CLI
 
 ```bash
@@ -263,7 +296,8 @@ python main.py validate-data   # data-quality report (implemented, Phase 3)
 python main.py validate-data --symbol EURUSD --timeframe H1
 python main.py backtest        # vectorbt screen + Backtrader validation (implemented, Phases 6-7)
 python main.py backtest --strategy trend_following --symbol EURUSD --timeframe H1 --scenario stress
-python main.py optimize        # Phase 8
+python main.py optimize --strategy trend_following --symbol EURUSD --timeframe H1  # implemented, Phase 8
+python main.py optimize --strategy mean_reversion --symbol EURUSD --timeframe H1 --trials 100 --scenario stress
 python main.py walk-forward    # Phase 9
 python main.py monte-carlo     # Phase 10
 python main.py portfolio       # Phase 11

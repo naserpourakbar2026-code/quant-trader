@@ -1,4 +1,6 @@
-from main import build_parser, cmd_backtest, cmd_download_data, cmd_info, cmd_validate_data
+import pytest
+
+from main import build_parser, cmd_backtest, cmd_download_data, cmd_info, cmd_optimize, cmd_validate_data
 
 
 def test_info_command_runs_and_returns_zero(capsys):
@@ -13,7 +15,7 @@ def test_info_command_runs_and_returns_zero(capsys):
 
 def test_pending_commands_return_nonzero_and_do_not_pretend_to_run():
     parser = build_parser()
-    for name in ["live", "report"]:
+    for name in ["walk-forward", "live", "report"]:
         args = parser.parse_args([name])
         exit_code = args.func(args)
         assert exit_code != 0
@@ -62,3 +64,28 @@ def test_validate_data_command_reports_skip_when_no_raw_file(capsys):
     assert exit_code == 0
     out = capsys.readouterr().out
     assert "Skipped" in out
+
+
+def test_optimize_command_reports_missing_when_no_raw_file(capsys):
+    parser = build_parser()
+    args = parser.parse_args(["optimize", "--strategy", "trend_following", "--symbol", "EURUSD", "--timeframe", "H1"])
+    assert args.func is cmd_optimize
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "No raw CSV found" in out
+
+
+def test_optimize_command_rejects_unknown_strategy(capsys):
+    parser = build_parser()
+    args = parser.parse_args(["optimize", "--strategy", "not_a_real_strategy", "--symbol", "EURUSD", "--timeframe", "H1"])
+    exit_code = args.func(args)
+    assert exit_code == 1
+    err = capsys.readouterr().err
+    assert "Unknown strategy" in err
+
+
+def test_optimize_command_requires_strategy_symbol_timeframe():
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["optimize", "--strategy", "trend_following"])

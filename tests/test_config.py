@@ -5,6 +5,8 @@ from src.core.config import (
     AppConfig,
     BrokersConfig,
     FeaturesConfig,
+    OptimizationConfig,
+    ParamSpec,
     StrategiesConfig,
     is_live_trading_enabled,
     load_brokers,
@@ -74,6 +76,13 @@ def test_risk_per_trade_must_be_in_allowed_levels():
                 "spread_outlier_zscore": 3.0,
             },
             features=VALID_FEATURES_KWARGS,
+            optimization={
+                "n_trials": 50,
+                "min_trades": 10,
+                "random_seed": 42,
+                "weights": {"profit_factor_cap": 5.0, "drawdown_penalty": 10.0, "trade_count_penalty": 0.5},
+                "stability": {"neighbor_step_pct": 0.1, "neighbor_step_int": 1},
+            },
             live_trading=False,
             paths={
                 "data_raw": "data/raw",
@@ -118,6 +127,29 @@ def test_load_settings_loads_features_config():
     settings = load_settings()
     assert isinstance(settings.features, FeaturesConfig)
     assert settings.features.ema_slow_period > settings.features.ema_fast_period
+
+
+def test_param_spec_rejects_low_not_less_than_high():
+    with pytest.raises(ValidationError):
+        ParamSpec(type="float", low=2.0, high=1.0)
+
+
+def test_param_spec_rejects_unsupported_type():
+    with pytest.raises(ValidationError):
+        ParamSpec(type="str", low=0.0, high=1.0)
+
+
+def test_load_settings_loads_optimization_config():
+    settings = load_settings()
+    assert isinstance(settings.optimization, OptimizationConfig)
+    assert settings.optimization.n_trials > 0
+
+
+def test_load_strategies_loads_optimization_space():
+    strategies = load_strategies()
+    trend = strategies.strategies["trend_following"]
+    assert "atr_stop_multiplier" in trend.optimization_space
+    assert trend.optimization_space["atr_stop_multiplier"].type == "float"
 
 
 def test_load_strategies_returns_three_strategy_families():

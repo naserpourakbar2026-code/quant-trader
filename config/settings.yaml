@@ -88,6 +88,23 @@ features:
   volatility_high_percentile: 75.0
   range_squeeze_lookback: 20     # trailing window for the Bollinger-width squeeze check
 
+optimization:
+  # CLAUDE.md Section 14: composite objective = Profit Factor + Sharpe +
+  # Sortino + Expectancy, penalized by max drawdown, low trade count, and
+  # (post-hoc, see Section 16 / src/optimization/optuna_engine.py) high
+  # parameter sensitivity. Weights below are stated, adjustable defaults,
+  # not a claim of optimality.
+  n_trials: 50
+  min_trades: 10          # trials with fewer trades than this are heavily penalized (unreliable sample)
+  random_seed: 42         # reproducibility (CLAUDE.md Section 36)
+  weights:
+    profit_factor_cap: 5.0     # caps a zero-losing-trade run's profit factor rather than treating it as infinite
+    drawdown_penalty: 10.0     # multiplier on |max_drawdown|
+    trade_count_penalty: 0.5   # multiplier per trade short of min_trades
+  stability:
+    neighbor_step_pct: 0.10    # float params: +/- this fraction when checking neighborhood stability
+    neighbor_step_int: 1       # int params: +/- this many steps
+
 live_trading: false               # never true by default; see .env LIVE_TRADING/LIVE_CONFIRMATION
 
 paths:

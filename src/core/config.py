@@ -156,6 +156,31 @@ class FeaturesConfig(BaseModel):
         return self
 
 
+class OptimizationWeights(BaseModel):
+    """Illustrative weighting for the composite objective (CLAUDE.md
+    Section 14: "Profit Factor + Sharpe + Sortino + Expectancy, penalized
+    by max drawdown, low trade count, and high parameter sensitivity").
+    Not a claim these exact weights are optimal — a stated, adjustable
+    default, same pattern as the cost-scenario placeholders."""
+
+    profit_factor_cap: float = Field(gt=0)  # cap so a zero-losing-trade run doesn't get an infinite score
+    drawdown_penalty: float = Field(ge=0)  # multiplier on |max_drawdown|
+    trade_count_penalty: float = Field(ge=0)  # multiplier per trade short of min_trades
+
+
+class StabilityConfig(BaseModel):
+    neighbor_step_pct: float = Field(gt=0, le=1)  # float params: perturb by +/- this fraction
+    neighbor_step_int: int = Field(gt=0)  # int params: perturb by +/- this many steps
+
+
+class OptimizationConfig(BaseModel):
+    n_trials: int = Field(gt=0)
+    min_trades: int = Field(gt=0)
+    random_seed: int
+    weights: OptimizationWeights
+    stability: StabilityConfig
+
+
 class PathsConfig(BaseModel):
     data_raw: str
     data_processed: str
@@ -177,6 +202,7 @@ class AppConfig(BaseModel):
     execution: ExecutionConfig
     validation: ValidationConfig
     features: FeaturesConfig
+    optimization: OptimizationConfig
     live_trading: bool
     paths: PathsConfig
     logging: LoggingConfig
@@ -192,12 +218,37 @@ class AppConfig(BaseModel):
         return v
 
 
+class ParamSpec(BaseModel):
+    """One tunable parameter's search range for Optuna (CLAUDE.md Section
+    14) — every entry here must have a logical economic/trading
+    justification; this is not an "optimize everything" grid."""
+
+    type: str  # "int" | "float"
+    low: float
+    high: float
+    step: float | None = None
+
+    @field_validator("type")
+    @classmethod
+    def type_must_be_supported(cls, v: str) -> str:
+        if v not in ("int", "float"):
+            raise ValueError(f"ParamSpec.type must be 'int' or 'float', got {v!r}")
+        return v
+
+    @model_validator(mode="after")
+    def low_less_than_high(self) -> "ParamSpec":
+        if self.low >= self.high:
+            raise ValueError(f"low ({self.low}) must be < high ({self.high})")
+        return self
+
+
 class StrategyDefinition(BaseModel):
     family: str
     enabled: bool = True
     symbols: list[str] = Field(default_factory=list)
     timeframes: list[str] = Field(default_factory=list)
     parameters: dict[str, Any] = Field(default_factory=dict)
+    optimization_space: dict[str, ParamSpec] = Field(default_factory=dict)
 
 
 class StrategiesConfig(BaseModel):

@@ -18,7 +18,9 @@ vectorbt>=1.1,<1.2
 backtrader>=1.9.78,<2.0
 
 # Optimization & stats
-optuna>=3.5,<4.0
+# optuna 5.0.0 is the version actually available/verified in this
+# environment's package index — not 3.5-3.x as originally guessed in Phase 1.
+optuna>=5.0,<6.0
 scikit-learn>=1.4,<2.0
 statsmodels>=0.14,<0.15
 

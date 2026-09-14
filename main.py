@@ -17,10 +17,10 @@ from src.core.logging import configure_logging, get_system_logger
 from src.data.csv_loader import load_csv
 from src.data.ingestion import run_download
 from src.data.validation import run_validation
+from src.optimization.optuna_engine import assess_parameter_stability, run_optimization
 
 # command -> (implemented, scheduled phase)
 COMMAND_PHASES: dict[str, tuple[bool, int]] = {
-    "optimize": (False, 8),
     "walk-forward": (False, 9),
     "monte-carlo": (False, 10),
     "portfolio": (False, 11),
@@ -176,6 +176,59 @@ def cmd_backtest(args: argparse.Namespace) -> int:
     return 0 if not errors else 1
 
 
+def cmd_optimize(args: argparse.Namespace) -> int:
+    """Optuna search over one strategy's configured optimization_space
+    for one symbol/timeframe (Phase 8), then a post-hoc parameter
+    stability check (Section 16). Deliberately scoped to a single,
+    explicit combination rather than a broad default sweep — a search
+    with dozens of trials per combination is not something to run
+    accidentally across every symbol/timeframe."""
+    strategies_cfg = load_strategies()
+    definition = strategies_cfg.strategies.get(args.strategy)
+    if definition is None:
+        print(f"Unknown strategy {args.strategy!r}; expected one of {sorted(strategies_cfg.strategies)}", file=sys.stderr)
+        return 1
+    if not definition.optimization_space:
+        print(f"Strategy {args.strategy!r} has no optimization_space configured in strategies.yaml.", file=sys.stderr)
+        return 1
+
+    try:
+        raw_df = load_csv(args.symbol, args.timeframe)
+    except FileNotFoundError as exc:
+        print(str(exc))
+        return 0
+
+    result = run_optimization(
+        args.strategy,
+        args.symbol,
+        args.timeframe,
+        raw_df,
+        definition.optimization_space,
+        n_trials=args.trials,
+        scenario=args.scenario,
+        seed=args.seed,
+    )
+    print(f"Optimized {args.strategy} {args.symbol} {args.timeframe} over {result.n_trials} trials "
+          f"(scenario={result.scenario!r}).")
+    print(f"  best params    : {result.best_params}")
+    print(f"  best objective : {result.best_objective:.4f}")
+    print(
+        f"  metrics        : return={result.best_metrics['total_return']:.4%} "
+        f"sharpe={result.best_metrics['sharpe_ratio']} trades={result.best_metrics['trade_count']}"
+    )
+
+    stability = assess_parameter_stability(
+        args.strategy, args.symbol, args.timeframe, raw_df, result.best_params,
+        definition.optimization_space, scenario=result.scenario,
+    )
+    print(
+        f"  stability score: {stability.score:.2f} "
+        "(0=isolated spike, 1=stable region — CLAUDE.md Section 16; never trust an isolated spike alone)"
+    )
+
+    return 0
+
+
 def _not_implemented(name: str, phase: int) -> int:
     logger = get_system_logger()
     message = (
@@ -219,6 +272,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     backtest_parser.add_argument("--scenario", help="optimistic|realistic|stress (default: execution.default_scenario)")
     backtest_parser.set_defaults(func=cmd_backtest)
+
+    optimize_parser = subparsers.add_parser(
+        "optimize", help="Optuna search + parameter stability check for one strategy/symbol/timeframe (Phase 8)"
+    )
+    optimize_parser.add_argument("--strategy", required=True, help="Strategy family (see config/strategies.yaml)")
+    optimize_parser.add_argument("--symbol", required=True, help="Symbol to optimize against")
+    optimize_parser.add_argument("--timeframe", required=True, help="Timeframe to optimize against")
+    optimize_parser.add_argument("--trials", type=int, help="Number of Optuna trials (default: optimization.n_trials)")
+    optimize_parser.add_argument("--scenario", help="optimistic|realistic|stress (default: execution.default_scenario)")
+    optimize_parser.add_argument("--seed", type=int, help="Random seed override (default: optimization.random_seed)")
+    optimize_parser.set_defaults(func=cmd_optimize)
 
     for name, (_implemented, phase) in COMMAND_PHASES.items():
         sub = subparsers.add_parser(name, help=f"(pending — Phase {phase})")
