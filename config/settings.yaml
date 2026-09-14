@@ -42,6 +42,16 @@ execution:
   scenarios: [optimistic, realistic, stress]
   default_scenario: realistic
 
+validation:
+  # Standard forex weekend closure window, used to tell an expected gap
+  # (market closed) apart from a genuine missing candle. Broker-specific —
+  # adjust if your broker's calendar differs. Times are UTC.
+  weekend_close_day: 4        # Friday (0=Monday)
+  weekend_close_hour: 21
+  weekend_open_day: 6         # Sunday
+  weekend_open_hour: 21
+  spread_outlier_zscore: 3.0  # spreads beyond this many std-devs are "abnormal"
+
 live_trading: false               # never true by default; see .env LIVE_TRADING/LIVE_CONFIRMATION
 
 paths:

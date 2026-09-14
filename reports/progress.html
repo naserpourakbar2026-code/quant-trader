@@ -50,9 +50,9 @@
     <p class="subtitle">Static snapshot — open this file directly, no server or code execution needed.</p>
 
     <div class="card">
-      <strong>Current phase:</strong> Phase 3 — Data validation
-      <div class="progress-bar"><div class="progress-fill" style="width:11%"></div></div>
-      <div style="color:var(--muted); font-size:0.85rem;">2 of 18 phases done</div>
+      <strong>Current phase:</strong> Phase 4 — Feature engine
+      <div class="progress-bar"><div class="progress-fill" style="width:17%"></div></div>
+      <div style="color:var(--muted); font-size:0.85rem;">3 of 18 phases done</div>
     </div>
 
     <div class="card">
@@ -70,10 +70,10 @@
         <td>Data ingestion</td>
         <td><span class="badge done">Done</span></td>
       </tr>
-      <tr class="pending">
+      <tr class="done">
         <td>3</td>
         <td>Data validation</td>
-        <td><span class="badge pending">Pending</span></td>
+        <td><span class="badge done">Done</span></td>
       </tr>
       <tr class="pending">
         <td>4</td>
@@ -155,7 +155,7 @@
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0;">Files created so far (38)</h2>
+      <h2 style="margin-top:0;">Files created so far (46)</h2>
       <div class="group">
         <h3>(root)/</h3>
         <ul>
@@ -214,6 +214,10 @@
           <li>src/core/config.py</li>
           <li>src/core/logging.py</li>
           <li>src/data/__init__.py</li>
+          <li>src/data/csv_loader.py</li>
+          <li>src/data/ingestion.py</li>
+          <li>src/data/mt5_loader.py</li>
+          <li>src/data/schema.py</li>
           <li>src/execution/__init__.py</li>
           <li>src/features/__init__.py</li>
           <li>src/montecarlo/__init__.py</li>
@@ -231,12 +235,16 @@
           <li>tests/__init__.py</li>
           <li>tests/test_cli.py</li>
           <li>tests/test_config.py</li>
+          <li>tests/test_csv_loader.py</li>
+          <li>tests/test_data_schema.py</li>
+          <li>tests/test_ingestion.py</li>
+          <li>tests/test_mt5_loader.py</li>
           <li>tests/test_project_structure.py</li>
         </ul>
       </div>
     </div>
 
-    <footer>Generated 2026-09-14 09:42 UTC by scripts/generate_progress_report.py</footer>
+    <footer>Generated 2026-09-14 09:48 UTC by scripts/generate_progress_report.py</footer>
   </div>
 </body>
 </html>

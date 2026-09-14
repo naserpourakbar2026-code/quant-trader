@@ -87,6 +87,14 @@ class ExecutionConfig(BaseModel):
         return v
 
 
+class ValidationConfig(BaseModel):
+    weekend_close_day: int = Field(ge=0, le=6)
+    weekend_close_hour: int = Field(ge=0, le=23)
+    weekend_open_day: int = Field(ge=0, le=6)
+    weekend_open_hour: int = Field(ge=0, le=23)
+    spread_outlier_zscore: float = Field(gt=0)
+
+
 class PathsConfig(BaseModel):
     data_raw: str
     data_processed: str
@@ -106,6 +114,7 @@ class AppConfig(BaseModel):
     risk: RiskConfig
     data: DataConfig
     execution: ExecutionConfig
+    validation: ValidationConfig
     live_trading: bool
     paths: PathsConfig
     logging: LoggingConfig

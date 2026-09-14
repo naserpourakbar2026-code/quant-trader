@@ -12,7 +12,7 @@ phase by phase (see Section 40 there); progress so far:
 |-------|-------------------------------------------------|---------|
 | 1     | Architecture + environment setup                | ✅ done |
 | 2     | Data ingestion                                  | ✅ done |
-| 3     | Data validation                                 | pending |
+| 3     | Data validation                                 | ✅ done |
 | 4     | Feature engine                                  | pending |
 | 5     | Three strategies                                | pending |
 | 6     | vectorbt research engine                        | pending |
@@ -81,13 +81,31 @@ Ingestion writes standardized candles (`timestamp, symbol, timeframe, open,
 high, low, close, tick_volume, spread, real_volume`) to
 `data/processed/<SYMBOL>_<TIMEFRAME>.csv`.
 
+## Data validation (Phase 3)
+
+`validate-data` runs the checks from CLAUDE.md Section 3 against the raw
+CSV for each symbol/timeframe and prints a `DATA QUALITY REPORT`. It only
+**detects** — it never repairs or drops anything:
+
+- duplicate timestamps / duplicate rows
+- out-of-order timestamps
+- impossible OHLC values (e.g. high below open/close/low) and negative/zero prices
+- abnormal spreads (z-score vs. `validation.spread_outlier_zscore` in `config/settings.yaml`)
+- missing candles (expected-frequency gaps, excluding the configured weekend closure window)
+- weekend candles (present but inside that closure window — often a broker/CFD-hours anomaly worth checking)
+- timezone inconsistencies (mixed `Z` / explicit-offset / naive timestamp strings in the raw file)
+
+The weekend-closure window and spread-outlier threshold are configurable
+under `validation:` in `config/settings.yaml` — broker calendars differ.
+
 ## CLI
 
 ```bash
 python main.py info            # environment/config summary (implemented)
 python main.py download-data   # ingest historical data (implemented, Phase 2)
 python main.py download-data --symbol EURUSD --timeframe H1
-python main.py validate-data   # Phase 3
+python main.py validate-data   # data-quality report (implemented, Phase 3)
+python main.py validate-data --symbol EURUSD --timeframe H1
 python main.py backtest        # Phase 7
 python main.py optimize        # Phase 8
 python main.py walk-forward    # Phase 9

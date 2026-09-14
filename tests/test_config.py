@@ -43,6 +43,13 @@ def test_risk_per_trade_must_be_in_allowed_levels():
                 "source": "csv",
             },
             execution={"scenarios": ["realistic"], "default_scenario": "realistic"},
+            validation={
+                "weekend_close_day": 4,
+                "weekend_close_hour": 21,
+                "weekend_open_day": 6,
+                "weekend_open_hour": 21,
+                "spread_outlier_zscore": 3.0,
+            },
             live_trading=False,
             paths={
                 "data_raw": "data/raw",

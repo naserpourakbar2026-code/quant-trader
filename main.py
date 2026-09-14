@@ -13,10 +13,10 @@ from datetime import datetime
 from src.core.config import is_live_trading_enabled, load_brokers, load_settings, load_strategies
 from src.core.logging import configure_logging, get_system_logger
 from src.data.ingestion import run_download
+from src.data.validation import run_validation
 
 # command -> (implemented, scheduled phase)
 COMMAND_PHASES: dict[str, tuple[bool, int]] = {
-    "validate-data": (False, 3),
     "backtest": (False, 7),
     "optimize": (False, 8),
     "walk-forward": (False, 9),
@@ -80,6 +80,29 @@ def cmd_download_data(args: argparse.Namespace) -> int:
     return 0 if not errors else 1
 
 
+def cmd_validate_data(args: argparse.Namespace) -> int:
+    """Run the Phase 3 data-quality checks and print a report per
+    symbol/timeframe. Detection only — never repairs anything found."""
+    symbols = [args.symbol] if args.symbol else None
+    timeframes = [args.timeframe] if args.timeframe else None
+
+    reports, skipped = run_validation(symbols=symbols, timeframes=timeframes)
+
+    for report in reports:
+        print(report.to_text())
+        print()
+
+    if skipped:
+        print(f"Skipped {len(skipped)} symbol/timeframe combination(s) with no raw data:")
+        for skip in skipped:
+            print(f"  {skip.symbol:8s} {skip.timeframe:4s}  {skip.reason}")
+
+    if not reports and not skipped:
+        print("Nothing to validate.")
+
+    return 0
+
+
 def _not_implemented(name: str, phase: int) -> int:
     logger = get_system_logger()
     message = (
@@ -105,6 +128,13 @@ def build_parser() -> argparse.ArgumentParser:
     download_parser.add_argument("--start", help="ISO date, required for mt5 source (e.g. 2024-01-01)")
     download_parser.add_argument("--end", help="ISO date, required for mt5 source")
     download_parser.set_defaults(func=cmd_download_data)
+
+    validate_parser = subparsers.add_parser(
+        "validate-data", help="Run data-quality checks and print a report (Phase 3)"
+    )
+    validate_parser.add_argument("--symbol", help="Limit to one symbol (default: all configured symbols)")
+    validate_parser.add_argument("--timeframe", help="Limit to one timeframe (default: all configured timeframes)")
+    validate_parser.set_defaults(func=cmd_validate_data)
 
     for name, (_implemented, phase) in COMMAND_PHASES.items():
         sub = subparsers.add_parser(name, help=f"(pending — Phase {phase})")

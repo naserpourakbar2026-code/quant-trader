@@ -1,4 +1,4 @@
-from main import build_parser, cmd_download_data, cmd_info
+from main import build_parser, cmd_download_data, cmd_info, cmd_validate_data
 
 
 def test_info_command_runs_and_returns_zero(capsys):
@@ -29,3 +29,14 @@ def test_download_data_command_reports_missing_when_no_raw_file(capsys):
     assert exit_code == 0
     out = capsys.readouterr().out
     assert "MISSING" in out
+
+
+def test_validate_data_command_reports_skip_when_no_raw_file(capsys):
+    """No CSV placed yet -> reported as skipped, exit code 0."""
+    parser = build_parser()
+    args = parser.parse_args(["validate-data", "--symbol", "EURUSD", "--timeframe", "H1"])
+    assert args.func is cmd_validate_data
+    exit_code = args.func(args)
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "Skipped" in out
