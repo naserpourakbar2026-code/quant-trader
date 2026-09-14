@@ -32,6 +32,13 @@ brokers:
     api_secret_env: BROKER_API_SECRET
     rate_limit:
       requests_per_second: 5
+    # API safety knobs (CLAUDE.md Section 25) -- adjustable per broker
+    # once a real one is chosen; these are stated, reasonable defaults,
+    # not a specific broker's documented limits.
+    timeout_seconds: 10
+    max_retries: 3
+    retry_base_delay_seconds: 1.0
+    stale_quote_max_age_seconds: 5.0
     commission:
       model: none
     spread_model: broker_provided

@@ -50,9 +50,9 @@
     <p class="subtitle">Static snapshot — open this file directly, no server or code execution needed.</p>
 
     <div class="card">
-      <strong>Current phase:</strong> Phase 13 — Generic REST/WebSocket broker adapter
-      <div class="progress-bar"><div class="progress-fill" style="width:67%"></div></div>
-      <div style="color:var(--muted); font-size:0.85rem;">12 of 18 phases done</div>
+      <strong>Current phase:</strong> Phase 14 — Paper trading
+      <div class="progress-bar"><div class="progress-fill" style="width:72%"></div></div>
+      <div style="color:var(--muted); font-size:0.85rem;">13 of 18 phases done</div>
     </div>
 
     <div class="card">
@@ -120,10 +120,10 @@
         <td>MT5 broker adapter (code + mocked tests)</td>
         <td><span class="badge done">Done</span></td>
       </tr>
-      <tr class="pending">
+      <tr class="done">
         <td>13</td>
         <td>Generic REST/WebSocket broker adapter</td>
-        <td><span class="badge pending">Pending</span></td>
+        <td><span class="badge done">Done</span></td>
       </tr>
       <tr class="pending">
         <td>14</td>
@@ -155,7 +155,7 @@
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0;">Files created so far (94)</h2>
+      <h2 style="margin-top:0;">Files created so far (97)</h2>
       <div class="group">
         <h3>(root)/</h3>
         <ul>
@@ -214,6 +214,8 @@
           <li>src/backtest/models.py</li>
           <li>src/backtest/vectorbt_engine.py</li>
           <li>src/brokers/__init__.py</li>
+          <li>src/brokers/base.py</li>
+          <li>src/brokers/mt5_adapter.py</li>
           <li>src/core/__init__.py</li>
           <li>src/core/config.py</li>
           <li>src/core/db.py</li>
@@ -272,6 +274,7 @@
           <li>tests/test_mc_engine.py</li>
           <li>tests/test_mean_reversion.py</li>
           <li>tests/test_momentum.py</li>
+          <li>tests/test_mt5_adapter.py</li>
           <li>tests/test_mt5_loader.py</li>
           <li>tests/test_optuna_engine.py</li>
           <li>tests/test_portfolio_engine.py</li>
@@ -292,7 +295,7 @@
       </div>
     </div>
 
-    <footer>Generated 2026-09-14 16:20 UTC by scripts/generate_progress_report.py</footer>
+    <footer>Generated 2026-09-14 16:28 UTC by scripts/generate_progress_report.py</footer>
   </div>
 </body>
 </html>

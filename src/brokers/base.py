@@ -43,6 +43,23 @@ class LiveTradingBlockedError(BrokerError):
     both true (CLAUDE.md Section 27) — refusing to send a real order."""
 
 
+class BrokerRejectionError(BrokerError):
+    """The broker actively rejected a request (e.g. HTTP 4xx) — as
+    opposed to BrokerConnectionError, which is "couldn't reach/trust the
+    broker at all" (CLAUDE.md Section 25's "broker rejection handling")."""
+
+
+class DuplicateOrderError(BrokerError):
+    """A client_order_id has already been submitted — refusing to send
+    it twice (CLAUDE.md Section 25's "duplicate order protection")."""
+
+
+class StalePriceError(BrokerError):
+    """A quote is older than the configured freshness threshold — acting
+    on it would risk trading on a price that's no longer real (CLAUDE.md
+    Section 25's "stale-price detection")."""
+
+
 class OrderSide(str, Enum):
     BUY = "BUY"
     SELL = "SELL"
@@ -203,3 +220,34 @@ class BrokerAdapter(ABC):
 
     @abstractmethod
     def get_order_status(self, order_id: str) -> OrderStatus: ...
+
+
+@dataclass
+class ReconciliationReport:
+    """CLAUDE.md Section 25: "reconcile local positions with broker
+    positions regularly." Broker-agnostic — works from two plain
+    `Position` lists, so any adapter's `get_positions()` output can be
+    compared against whatever an execution layer (Phase 14) believes
+    locally, without either side depending on the other's internals."""
+
+    missing_locally: list[Position] = field(default_factory=list)  # broker has it, local bookkeeping doesn't
+    missing_at_broker: list[Position] = field(default_factory=list)  # local bookkeeping has it, broker doesn't
+    mismatched: list[tuple[Position, Position]] = field(default_factory=list)  # same id, different volume/side/sl/tp
+
+    @property
+    def is_clean(self) -> bool:
+        return not (self.missing_locally or self.missing_at_broker or self.mismatched)
+
+
+def reconcile_positions(local_positions: list[Position], broker_positions: list[Position]) -> ReconciliationReport:
+    local_by_id = {p.position_id: p for p in local_positions}
+    broker_by_id = {p.position_id: p for p in broker_positions}
+
+    missing_locally = [p for pid, p in broker_by_id.items() if pid not in local_by_id]
+    missing_at_broker = [p for pid, p in local_by_id.items() if pid not in broker_by_id]
+    mismatched = [
+        (local_by_id[pid], broker_by_id[pid])
+        for pid in local_by_id.keys() & broker_by_id.keys()
+        if (local_by_id[pid].volume, local_by_id[pid].side) != (broker_by_id[pid].volume, broker_by_id[pid].side)
+    ]
+    return ReconciliationReport(missing_locally=missing_locally, missing_at_broker=missing_at_broker, mismatched=mismatched)

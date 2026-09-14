@@ -22,7 +22,7 @@ phase by phase (see Section 40 there); progress so far:
 | 10    | Monte Carlo                                     | ✅ done |
 | 11    | Portfolio engine                                | ✅ done |
 | 12    | MT5 adapter (code + mocked tests, Windows-only) | ✅ done |
-| 13    | Generic broker API adapter                      | pending |
+| 13    | Generic broker API adapter                      | ✅ done |
 | 14    | Paper trading                                   | pending |
 | 15    | Risk & kill switch                              | pending |
 | 16    | Reporting                                       | pending |
@@ -422,7 +422,7 @@ running the single best one.
   each survivor's individual metrics, the correlation matrix, and each
   allocation method's weights/metrics/improved-vs-not verdict.
 
-## Broker adapters (Phase 12: MT5)
+## Broker adapters (Phase 12: MT5; Phase 13: generic REST/WebSocket)
 
 `src/brokers/base.py` — CLAUDE.md Section 21's abstract `BrokerAdapter`:
 `connect`/`disconnect`, `get_account`/`get_balance`/`get_equity`,
@@ -439,7 +439,12 @@ halt flag checked before any order-sending call) and
 `cancel_order`/`close_position` whenever `environment == "live"` unless
 **both** `LIVE_TRADING=true` and `LIVE_CONFIRMATION=true` are set. A
 `"demo"` connection is never gated by those two flags — no real money is
-at risk there.
+at risk there. `base.py` also holds `reconcile_positions()` (CLAUDE.md
+Section 25's "reconcile local positions with broker positions
+regularly") — broker-agnostic, comparing two plain `Position` lists by
+id, volume and side, so any adapter's `get_positions()` output can be
+checked against an execution layer's own bookkeeping (Phase 14) without
+either depending on the other's internals.
 
 `src/brokers/mt5_adapter.py` — `MT5Adapter`, the first implementation.
 **Environment constraint (Section 22): the `MetaTrader5` Python package
@@ -467,6 +472,59 @@ hard-coded (Sections 22, 24, 42). `brokers.mt5.enabled` is `false` by
 default; connecting for real requires enabling it, running on Windows
 with `requirements-windows.txt` installed and a terminal open, and
 filling in `.env`.
+
+`src/brokers/generic_rest_adapter.py` — `GenericRestAdapter`, the second
+implementation (Section 23). No real broker is named in the brief, so
+this adapter defines its own small, self-describing REST convention
+(`GET /account`, `/positions`, `/symbols/{symbol}`, `/quotes/{symbol}`;
+`POST/PATCH/DELETE /orders...`; `POST /positions/{id}/close`) rather than
+guessing a specific broker's actual schema — plugging in a real broker
+later means translating its responses onto the same shared dataclasses
+this adapter already produces; strategy/risk/execution code (which only
+ever sees `BrokerAdapter`) needs no changes at all.
+
+Section 25's full API-safety list is implemented, all in
+`src/brokers/resilience.py` (broker-agnostic, so any future adapter can
+reuse it) plus this adapter's own request path:
+- **Rate limiting** — `RateLimiter` (a simple minimum-interval enforcer,
+  not a token bucket — a deliberate "basic" choice), applied to every
+  request.
+- **Retry with exponential backoff** — `retry_with_backoff()` on
+  connection errors/timeouts/5xx; every timing source is injectable, so
+  tests never actually sleep.
+- **Timeout**, **connection recovery** — `requests`' own `timeout=` on
+  every call; a fresh `requests.Session` per `connect()`.
+- **Duplicate-order protection / idempotency** — a `client_order_id`
+  already submitted in-process is refused before any HTTP call, and
+  passed to the broker too (Section 25's own "where supported" caveat —
+  a generic adapter can't assume every broker honors it).
+- **Order-state reconciliation** — `reconcile()`, wrapping
+  `reconcile_positions()` above.
+- **Broker rejection handling** — HTTP 4xx raises `BrokerRejectionError`,
+  distinct from `BrokerConnectionError` ("couldn't trust the broker's
+  response at all").
+- **Partial-fill handling** — a "FILLED" response with
+  `filled_volume` less than requested is downgraded to
+  `PARTIALLY_FILLED`.
+- **Stale-price detection** — `get_quote()` raises `StalePriceError` if
+  the quote is older than `stale_quote_max_age_seconds`.
+
+`stream_quotes()` is a minimal, honestly-scoped WebSocket addition
+(Section 23's other half): it proves the adapter can open, subscribe on,
+and consume a streaming connection generically (an injectable connector,
+default `websockets.connect`) — it is **not** wired into `get_quote()` or
+anywhere else; turning a quote stream into what paper trading (Phase 14)
+consumes is that phase's job.
+
+`tests/test_generic_rest_adapter.py` (33 tests) stubs `requests.Session`
+with a fake answering from a canned response table, and the WebSocket
+half with a fake async connector — this pins down `GenericRestAdapter`'s
+own request-building/response-mapping/retry/reconciliation logic, and
+says nothing about how any specific real broker's API actually looks,
+since none is chosen yet. `build_from_config()` wires
+`config/brokers.yaml`'s `brokers.generic_rest` block plus `.env`
+(`BROKER_API_KEY`/`BROKER_API_SECRET`/`BROKER_ACCOUNT_ID`) into an
+adapter instance; `brokers.generic_rest.enabled` is `false` by default.
 
 ## CLI
 
