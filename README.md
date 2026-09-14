@@ -13,7 +13,7 @@ phase by phase (see Section 40 there); progress so far:
 | 1     | Architecture + environment setup                | ✅ done |
 | 2     | Data ingestion                                  | ✅ done |
 | 3     | Data validation                                 | ✅ done |
-| 4     | Feature engine                                  | pending |
+| 4     | Feature engine                                  | ✅ done |
 | 5     | Three strategies                                | pending |
 | 6     | vectorbt research engine                        | pending |
 | 7     | Backtrader validation engine                    | pending |
@@ -97,6 +97,30 @@ CSV for each symbol/timeframe and prints a `DATA QUALITY REPORT`. It only
 
 The weekend-closure window and spread-outlier threshold are configurable
 under `validation:` in `config/settings.yaml` — broker calendars differ.
+
+## Feature engine (Phase 4)
+
+`src/features/` is the shared indicator/regime library every strategy
+family (Phase 5) will build on — a pure library, not a CLI command (the
+brief's CLI list has none for it):
+
+- `src/features/indicators.py`: EMA, ATR (Wilder), Donchian channel,
+  Bollinger Bands, RSI (Wilder), rate of change, distance from a moving
+  average (in % and in ATR units).
+- `src/features/regime.py`: objective, threshold-based classification —
+  `classify_trend` (no/weak/strong, from the ATR-normalized slope of the
+  slow EMA, only counted when the fast EMA agrees with its direction),
+  `classify_volatility` (low/normal/high, from the ATR's own trailing
+  percentile rank), `classify_range` (a Bollinger-width squeeze while
+  `no_trend`).
+- `src/features/engine.py`: `compute_features(df)` runs all of the above
+  on one symbol/timeframe's standardized candles and adds a
+  `breakout_strength` column (signed distance, in ATR units, beyond the
+  *prior* bar's Donchian channel).
+
+All periods/thresholds live under `features:` in `config/settings.yaml`
+(`FeatureParams.from_settings()`) and can be overridden per call — e.g. for
+Optuna sweeps in Phase 8.
 
 ## CLI
 

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = PROJECT_ROOT / "config"
@@ -95,6 +95,47 @@ class ValidationConfig(BaseModel):
     spread_outlier_zscore: float = Field(gt=0)
 
 
+class FeaturesConfig(BaseModel):
+    ema_fast_period: int = Field(gt=0)
+    ema_slow_period: int = Field(gt=0)
+    atr_period: int = Field(gt=0)
+    donchian_period: int = Field(gt=0)
+    bollinger_period: int = Field(gt=0)
+    bollinger_std: float = Field(gt=0)
+    rsi_period: int = Field(gt=0)
+    momentum_period: int = Field(gt=0)
+    trend_slope_lookback: int = Field(gt=0)
+    trend_strong_threshold: float = Field(gt=0)
+    trend_weak_threshold: float = Field(gt=0)
+    volatility_lookback: int = Field(gt=0)
+    volatility_low_percentile: float = Field(ge=0, le=100)
+    volatility_high_percentile: float = Field(ge=0, le=100)
+    range_squeeze_lookback: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def cross_field_ordering(self) -> "FeaturesConfig":
+        # Cross-field checks in one place (not per-field validators) since
+        # pydantic v2 validates fields in declaration order and these pairs
+        # aren't declared in an order that would make per-field checks
+        # reliably see both sides.
+        if self.ema_slow_period <= self.ema_fast_period:
+            raise ValueError(
+                f"ema_slow_period ({self.ema_slow_period}) must be greater than "
+                f"ema_fast_period ({self.ema_fast_period})"
+            )
+        if self.trend_strong_threshold <= self.trend_weak_threshold:
+            raise ValueError(
+                f"trend_strong_threshold ({self.trend_strong_threshold}) must be greater than "
+                f"trend_weak_threshold ({self.trend_weak_threshold})"
+            )
+        if self.volatility_high_percentile <= self.volatility_low_percentile:
+            raise ValueError(
+                f"volatility_high_percentile ({self.volatility_high_percentile}) must be greater than "
+                f"volatility_low_percentile ({self.volatility_low_percentile})"
+            )
+        return self
+
+
 class PathsConfig(BaseModel):
     data_raw: str
     data_processed: str
@@ -115,6 +156,7 @@ class AppConfig(BaseModel):
     data: DataConfig
     execution: ExecutionConfig
     validation: ValidationConfig
+    features: FeaturesConfig
     live_trading: bool
     paths: PathsConfig
     logging: LoggingConfig

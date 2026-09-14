@@ -4,12 +4,31 @@ from pydantic import ValidationError
 from src.core.config import (
     AppConfig,
     BrokersConfig,
+    FeaturesConfig,
     StrategiesConfig,
     is_live_trading_enabled,
     load_brokers,
     load_settings,
     load_strategies,
 )
+
+VALID_FEATURES_KWARGS = {
+    "ema_fast_period": 20,
+    "ema_slow_period": 50,
+    "atr_period": 14,
+    "donchian_period": 20,
+    "bollinger_period": 20,
+    "bollinger_std": 2.0,
+    "rsi_period": 14,
+    "momentum_period": 10,
+    "trend_slope_lookback": 10,
+    "trend_strong_threshold": 1.0,
+    "trend_weak_threshold": 0.3,
+    "volatility_lookback": 100,
+    "volatility_low_percentile": 25.0,
+    "volatility_high_percentile": 75.0,
+    "range_squeeze_lookback": 20,
+}
 
 
 def test_load_settings_returns_valid_app_config():
@@ -50,6 +69,7 @@ def test_risk_per_trade_must_be_in_allowed_levels():
                 "weekend_open_hour": 21,
                 "spread_outlier_zscore": 3.0,
             },
+            features=VALID_FEATURES_KWARGS,
             live_trading=False,
             paths={
                 "data_raw": "data/raw",
@@ -66,6 +86,34 @@ def test_data_source_rejects_unsupported_value():
     settings = load_settings()
     with pytest.raises(ValidationError):
         type(settings.data)(**{**settings.data.model_dump(), "source": "unsupported"})
+
+
+def test_features_config_accepts_valid_defaults():
+    cfg = FeaturesConfig(**VALID_FEATURES_KWARGS)
+    assert cfg.ema_slow_period > cfg.ema_fast_period
+
+
+def test_features_config_rejects_slow_ema_not_greater_than_fast():
+    with pytest.raises(ValidationError):
+        FeaturesConfig(**{**VALID_FEATURES_KWARGS, "ema_slow_period": 10, "ema_fast_period": 20})
+
+
+def test_features_config_rejects_strong_threshold_not_greater_than_weak():
+    with pytest.raises(ValidationError):
+        FeaturesConfig(**{**VALID_FEATURES_KWARGS, "trend_strong_threshold": 0.2, "trend_weak_threshold": 0.3})
+
+
+def test_features_config_rejects_high_percentile_not_greater_than_low():
+    with pytest.raises(ValidationError):
+        FeaturesConfig(
+            **{**VALID_FEATURES_KWARGS, "volatility_high_percentile": 20.0, "volatility_low_percentile": 25.0}
+        )
+
+
+def test_load_settings_loads_features_config():
+    settings = load_settings()
+    assert isinstance(settings.features, FeaturesConfig)
+    assert settings.features.ema_slow_period > settings.features.ema_fast_period
 
 
 def test_load_strategies_returns_empty_registry_before_phase5():

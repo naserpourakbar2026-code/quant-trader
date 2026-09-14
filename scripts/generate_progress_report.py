@@ -35,7 +35,7 @@ PHASES: list[Phase] = [
     Phase(1, "Architecture + environment setup", "done"),
     Phase(2, "Data ingestion", "done"),
     Phase(3, "Data validation", "done"),
-    Phase(4, "Feature engine", "pending"),
+    Phase(4, "Feature engine", "done"),
     Phase(5, "Three strategies", "pending"),
     Phase(6, "vectorbt research engine", "pending"),
     Phase(7, "Backtrader validation engine", "pending"),
