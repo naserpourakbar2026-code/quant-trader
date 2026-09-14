@@ -40,7 +40,7 @@ PHASES: list[Phase] = [
     Phase(6, "vectorbt research engine", "done"),
     Phase(7, "Backtrader validation engine", "done"),
     Phase(8, "Optuna optimization", "done"),
-    Phase(9, "Walk-forward analysis", "pending"),
+    Phase(9, "Walk-forward analysis", "done"),
     Phase(10, "Monte Carlo analysis", "pending"),
     Phase(11, "Portfolio engine", "pending"),
     Phase(12, "MT5 broker adapter (code + mocked tests)", "pending"),

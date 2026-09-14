@@ -90,6 +90,7 @@ def run_screening(
     feature_params: FeatureParams | None = None,
     scenario: str | None = None,
     initial_capital: float | None = None,
+    warmup_df: pd.DataFrame | None = None,
     persist: bool = True,
     db: Database | None = None,
 ) -> ScreeningResult:
@@ -97,6 +98,13 @@ def run_screening(
 
     `raw_df` is standardized candle data (src.data.schema columns) for a
     single symbol/timeframe — e.g. from src.data.csv_loader.load_csv().
+
+    `warmup_df`, if given, is *earlier* standardized candles prepended
+    only so every indicator has proper history (no artificial NaN
+    warm-up gap) — used by Phase 9's walk-forward engine so a
+    validation/OOS window's indicators aren't computed in a vacuum.
+    Entries/exits/metrics are still computed only over `raw_df`'s own
+    rows; `warmup_df` never contributes a trade or a metric.
     """
     settings = load_settings()
     scenario = scenario or settings.execution.default_scenario
@@ -105,11 +113,19 @@ def run_screening(
     cost = settings.execution.costs[scenario]
     capital = initial_capital if initial_capital is not None else settings.account.initial_capital
 
-    feature_df = compute_features(raw_df, feature_params)
+    has_warmup = warmup_df is not None and not warmup_df.empty
+    combined_raw = pd.concat([warmup_df, raw_df], ignore_index=True) if has_warmup else raw_df
+
+    feature_df = compute_features(combined_raw, feature_params)
     indexed = feature_df.set_index("timestamp")
 
     strat = create_strategy(strategy_family, strategy_params)
     table = strat.generate_signals_vectorized(feature_df).set_axis(indexed.index)
+
+    if has_warmup:
+        cutoff = len(warmup_df)
+        indexed = indexed.iloc[cutoff:]
+        table = table.iloc[cutoff:]
 
     close = indexed["close"]
     long_entries, long_exits, short_entries, short_exits = _direction_transitions(table["direction"])

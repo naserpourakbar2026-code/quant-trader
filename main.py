@@ -18,10 +18,10 @@ from src.data.csv_loader import load_csv
 from src.data.ingestion import run_download
 from src.data.validation import run_validation
 from src.optimization.optuna_engine import assess_parameter_stability, run_optimization
+from src.walkforward.wfa_engine import run_walk_forward
 
 # command -> (implemented, scheduled phase)
 COMMAND_PHASES: dict[str, tuple[bool, int]] = {
-    "walk-forward": (False, 9),
     "monte-carlo": (False, 10),
     "portfolio": (False, 11),
     "paper-trade": (False, 14),
@@ -229,6 +229,48 @@ def cmd_optimize(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_walk_forward(args: argparse.Namespace) -> int:
+    """Rolling walk-forward analysis (Phase 9, CLAUDE.md Section 15):
+    optimize on training only, validate, then test on out-of-sample data
+    the optimizer never saw, moving the window forward and repeating.
+    Deliberately scoped to a single, explicit combination — this runs a
+    full Optuna search per window, so it is strictly more expensive than
+    `optimize` and should never fire across every symbol/timeframe by
+    accident."""
+    strategies_cfg = load_strategies()
+    definition = strategies_cfg.strategies.get(args.strategy)
+    if definition is None:
+        print(f"Unknown strategy {args.strategy!r}; expected one of {sorted(strategies_cfg.strategies)}", file=sys.stderr)
+        return 1
+    if not definition.optimization_space:
+        print(f"Strategy {args.strategy!r} has no optimization_space configured in strategies.yaml.", file=sys.stderr)
+        return 1
+
+    try:
+        raw_df = load_csv(args.symbol, args.timeframe)
+    except FileNotFoundError as exc:
+        print(str(exc))
+        return 0
+
+    report = run_walk_forward(
+        args.strategy,
+        args.symbol,
+        args.timeframe,
+        raw_df,
+        definition.optimization_space,
+        train_pct=args.train_pct,
+        validation_pct=args.validation_pct,
+        oos_pct=args.oos_pct,
+        window_bars=args.window_bars,
+        step_bars=args.step_bars,
+        n_trials=args.trials,
+        scenario=args.scenario,
+        seed=args.seed,
+    )
+    print(report.to_text())
+    return 0
+
+
 def _not_implemented(name: str, phase: int) -> int:
     logger = get_system_logger()
     message = (
@@ -283,6 +325,24 @@ def build_parser() -> argparse.ArgumentParser:
     optimize_parser.add_argument("--scenario", help="optimistic|realistic|stress (default: execution.default_scenario)")
     optimize_parser.add_argument("--seed", type=int, help="Random seed override (default: optimization.random_seed)")
     optimize_parser.set_defaults(func=cmd_optimize)
+
+    wf_parser = subparsers.add_parser(
+        "walk-forward", help="Rolling train/validate/OOS walk-forward analysis (Phase 9)"
+    )
+    wf_parser.add_argument("--strategy", required=True, help="Strategy family (see config/strategies.yaml)")
+    wf_parser.add_argument("--symbol", required=True, help="Symbol to analyze")
+    wf_parser.add_argument("--timeframe", required=True, help="Timeframe to analyze")
+    wf_parser.add_argument("--trials", type=int, help="Optuna trials per window (default: optimization.n_trials)")
+    wf_parser.add_argument("--train-pct", type=float, default=0.6, dest="train_pct")
+    wf_parser.add_argument("--validation-pct", type=float, default=0.2, dest="validation_pct")
+    wf_parser.add_argument("--oos-pct", type=float, default=0.2, dest="oos_pct")
+    wf_parser.add_argument(
+        "--window-bars", type=int, dest="window_bars", help="Bars per window (default: the whole series, one window)"
+    )
+    wf_parser.add_argument("--step-bars", type=int, dest="step_bars", help="Bars to advance per window (default: OOS length)")
+    wf_parser.add_argument("--scenario", help="optimistic|realistic|stress (default: execution.default_scenario)")
+    wf_parser.add_argument("--seed", type=int, help="Random seed override (default: optimization.random_seed)")
+    wf_parser.set_defaults(func=cmd_walk_forward)
 
     for name, (_implemented, phase) in COMMAND_PHASES.items():
         sub = subparsers.add_parser(name, help=f"(pending — Phase {phase})")

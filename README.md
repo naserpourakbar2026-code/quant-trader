@@ -18,7 +18,7 @@ phase by phase (see Section 40 there); progress so far:
 | 6     | vectorbt research engine                        | ✅ done |
 | 7     | Backtrader validation engine                    | ✅ done |
 | 8     | Optuna optimization                             | ✅ done |
-| 9     | Walk-forward                                    | pending |
+| 9     | Walk-forward                                    | ✅ done |
 | 10    | Monte Carlo                                     | pending |
 | 11    | Portfolio engine                                | pending |
 | 12    | MT5 adapter (code + mocked tests, Windows-only) | pending |
@@ -73,9 +73,12 @@ construct their own `Database("sqlite:///:memory:")` so they never touch
 the real project database. Currently holds `experiments`
 (`src/backtest/models.py`) — one row per vectorbt screening or Backtrader
 validation run, distinguished by an `engine` column ("vectorbt" |
-"backtrader") so the two can be queried and compared side by side. More
-tables arrive with the phases that need them (optimization/walk-forward/
-Monte Carlo results, ...).
+"backtrader") — Optuna's best trial persists here too, with `engine:
+"optuna"`. Also holds `walkforward_windows`
+(`src/walkforward/models.py`) — one row per walk-forward window (Phase
+9), a different kind of record (three sub-periods and a pass/fail
+verdict) than a single backtest `Experiment`. More tables arrive with
+the phases that need them (Monte Carlo results, ...).
 
 ## Data ingestion (Phase 2)
 
@@ -286,6 +289,47 @@ computation live/paper trading and Backtrader validation do.
   something to run accidentally across every combination) and prints the
   best parameters, objective, key metrics, and the stability score.
 
+## Walk-forward analysis (Phase 9)
+
+`src/walkforward/wfa_engine.py` — CLAUDE.md Section 15's rolling
+train/validate/out-of-sample discipline, plus Section 18's out-of-sample
+requirement. Each window is split Training 60% / Validation 20% /
+Out-of-Sample 20% (configurable): optimize on training only (Phase 8's
+Optuna engine) → assess the chosen parameters' stability (Section 16) →
+validate the frozen parameters on the validation slice → test on
+out-of-sample data the optimizer never saw. The window then advances and
+repeats ("rolling windows").
+
+- **Never optimizes using OOS data** — enforced by construction, not by
+  convention: `run_optimization()` only ever receives the training
+  slice; validation/OOS data only ever reaches `run_screening()`'s
+  read-only scoring path.
+- **Indicator continuity without leakage**: each slice is screened with
+  every *earlier* row (from the very start of the series) passed as
+  `warmup_df` (a new parameter on `run_screening()`/`run_optimization()`/
+  `assess_parameter_stability()`), so a window's indicators have real
+  history instead of an artificial NaN warm-up gap — while trades and
+  metrics are still scored only over that window's own rows, never the
+  warmup context.
+- A window's out-of-sample verdict is `composite_objective(oos_metrics) >
+  0` (Phase 8's own objective, reused for consistency) — Section 18's
+  "if a strategy fails OOS, reject it", made concrete.
+- `WalkForwardReport.parameter_consistency()` extends Section 16's
+  "never trust an isolated spike" across *time*: the coefficient of
+  variation of each tunable parameter's chosen value across windows —
+  low means the search keeps landing on similar values window after
+  window, not scattering.
+- Persists one `WalkForwardWindow` row per window
+  (`src/walkforward/window_store.py`, its own table — a window is a
+  different kind of record than a single backtest `Experiment`: three
+  sub-periods and a pass/fail verdict, not one run).
+- `python main.py walk-forward` requires an explicit `--strategy
+  --symbol --timeframe` (strictly more expensive than `optimize` — a
+  full Optuna search runs *per window*) and prints the full report:
+  every window's date ranges, chosen parameters, stability score,
+  OOS metrics and verdict, plus the aggregate OOS pass rate and
+  parameter-consistency table.
+
 ## CLI
 
 ```bash
@@ -298,7 +342,8 @@ python main.py backtest        # vectorbt screen + Backtrader validation (implem
 python main.py backtest --strategy trend_following --symbol EURUSD --timeframe H1 --scenario stress
 python main.py optimize --strategy trend_following --symbol EURUSD --timeframe H1  # implemented, Phase 8
 python main.py optimize --strategy mean_reversion --symbol EURUSD --timeframe H1 --trials 100 --scenario stress
-python main.py walk-forward    # Phase 9
+python main.py walk-forward --strategy trend_following --symbol EURUSD --timeframe H1  # implemented, Phase 9
+python main.py walk-forward --strategy trend_following --symbol EURUSD --timeframe H1 --window-bars 600 --step-bars 300
 python main.py monte-carlo     # Phase 10
 python main.py portfolio       # Phase 11
 python main.py paper-trade     # Phase 14

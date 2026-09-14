@@ -45,6 +45,36 @@ def _synthetic_raw_candles(n=400, seed=1, symbol="EURUSD", timeframe="H1"):
     )[STANDARD_COLUMNS]
 
 
+def test_warmup_df_gives_indicators_proper_history_without_scoring_it(db):
+    """A 60-bar scored window alone is far too short for volatility_lookback
+    (100) to ever produce a non-NaN volatility_regime — every bar would be
+    stuck in "warm-up", making the window artificially untradeable. With
+    400 bars of real preceding history as warmup_df, the same window's
+    indicators have proper context, while only the 60 scored bars remain
+    the actual date range persisted/evaluated (warmup contributes no
+    trade and no metric)."""
+    from src.features.engine import compute_features
+
+    full = _synthetic_raw_candles(n=460)
+    warmup = full.iloc[:400].reset_index(drop=True)
+    scored = full.iloc[400:].reset_index(drop=True)
+
+    # Premise: scored alone can never leave warm-up (proves the test is
+    # meaningful, not just "it ran").
+    features_alone = compute_features(scored)
+    assert features_alone["volatility_regime"].isna().all()
+
+    result = run_screening("trend_following", "EURUSD", "H1", scored, warmup_df=warmup, db=db)
+
+    records = list_experiments(db=db)
+    assert len(records) == 1
+    # SQLite's DateTime column round-trips as naive, so compare naive-to-naive.
+    assert records[0].date_range_start == scored["timestamp"].iloc[0].tz_localize(None).to_pydatetime()
+    assert records[0].date_range_end == scored["timestamp"].iloc[-1].tz_localize(None).to_pydatetime()
+    # never the warmup range
+    assert records[0].date_range_start != warmup["timestamp"].iloc[0].tz_localize(None).to_pydatetime()
+
+
 def test_run_screening_returns_sane_metrics_and_persists(db):
     raw = _synthetic_raw_candles()
     result = run_screening("trend_following", "EURUSD", "H1", raw, db=db)

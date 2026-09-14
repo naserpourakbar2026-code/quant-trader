@@ -96,6 +96,7 @@ def run_optimization(
     n_trials: int | None = None,
     scenario: str | None = None,
     seed: int | None = None,
+    warmup_df: pd.DataFrame | None = None,
     persist: bool = True,
     db: Database | None = None,
 ) -> OptimizationResult:
@@ -105,6 +106,11 @@ def run_optimization(
     as an Experiment — individual trials are not (they'd flood the table
     for no benefit; the study itself isn't reproducible-record material
     the way one strategy/parameter/data combination's outcome is).
+
+    `warmup_df`, if given, is passed straight through to run_screening()
+    for indicator history only — see that function's docstring. Used by
+    Phase 9's walk-forward engine so a training window's indicators have
+    real preceding history instead of a NaN warm-up gap.
     """
     if not space:
         raise ValueError("space must not be empty — nothing to optimize")
@@ -127,6 +133,7 @@ def run_optimization(
             strategy_params=strategy_kwargs,
             feature_params=feature_params,
             scenario=scenario,
+            warmup_df=warmup_df,
             persist=False,
         )
         return composite_objective(result.metrics, cfg)
@@ -145,6 +152,7 @@ def run_optimization(
         strategy_params=best_strategy_kwargs,
         feature_params=best_feature_params,
         scenario=scenario,
+        warmup_df=warmup_df,
         persist=False,
     )
 
@@ -200,6 +208,7 @@ def assess_parameter_stability(
     space: dict[str, ParamSpec],
     *,
     scenario: str | None = None,
+    warmup_df: pd.DataFrame | None = None,
 ) -> StabilityResult:
     """CLAUDE.md Section 16: never trust an isolated spike. Perturbs each
     tunable parameter by one step (holding the others at `best_params`)
@@ -208,6 +217,9 @@ def assess_parameter_stability(
     Runs len(space)*2 additional vectorbt screens — cheap enough to do
     once after the search, prohibitively expensive to do inside every
     trial (which is why this is a separate, post-hoc step).
+
+    `warmup_df` is passed straight through to run_screening() — see
+    run_optimization()'s docstring.
     """
     settings = load_settings()
     cfg = settings.optimization
@@ -224,6 +236,7 @@ def assess_parameter_stability(
             strategy_params=strategy_kwargs,
             feature_params=feature_params,
             scenario=scenario,
+            warmup_df=warmup_df,
             persist=False,
         )
         return composite_objective(result.metrics, cfg)
