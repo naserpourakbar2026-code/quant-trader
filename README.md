@@ -15,7 +15,7 @@ phase by phase (see Section 40 there); progress so far:
 | 3     | Data validation                                 | ✅ done |
 | 4     | Feature engine                                  | ✅ done |
 | 5     | Three strategies                                | ✅ done |
-| 6     | vectorbt research engine                        | pending |
+| 6     | vectorbt research engine                        | ✅ done |
 | 7     | Backtrader validation engine                    | pending |
 | 8     | Optuna optimization                             | pending |
 | 9     | Walk-forward                                    | pending |
@@ -62,6 +62,17 @@ All trading-relevant values live in YAML, never hard-coded:
 
 Config is loaded and validated through pydantic models in
 `src/core/config.py`.
+
+## Database (Phase 6)
+
+SQLite via SQLAlchemy (`src/core/db.py`), so a later move to PostgreSQL
+only needs a `DATABASE_URL` change (CLAUDE.md Section 29). Defaults to
+`data/quant_trader.db`; override via `.env`'s `DATABASE_URL`. Production
+code calls `get_default_database()` (a lazily-created singleton); tests
+construct their own `Database("sqlite:///:memory:")` so they never touch
+the real project database. Currently holds `experiments`
+(`src/backtest/models.py`) — more tables arrive with the phases that need
+them (backtests, optimization/walk-forward/Monte Carlo results, ...).
 
 ## Data ingestion (Phase 2)
 
@@ -157,6 +168,47 @@ empirical question for Backtrader validation (Phase 7) and Optuna (Phase
 assumes the traded pair's quote currency equals the account currency — a
 stated simplification until real broker pip-value/contract-size
 specifications are available from a connected broker adapter (Phase 12/13).
+
+## vectorbt research engine (Phase 6)
+
+`src/backtest/vectorbt_engine.py` — fast, vectorized screening across
+strategy × symbol × timeframe × parameter combinations (CLAUDE.md Section
+12). A coarse filter, not the final word: Backtrader (Phase 7) re-checks
+survivors with realistic, event-driven execution.
+
+- `run_screening(strategy_family, symbol, timeframe, raw_df, ...)` computes
+  features, reads the strategy's `generate_signals_vectorized()` table
+  (the *same* table `generate_signal()` reads from for live/paper trading
+  — see Phase 5 above), converts it into vectorbt entries/exits plus
+  fractional SL/TP, and runs `vbt.Portfolio.from_signals()` under one of
+  three cost scenarios (`execution.costs` in `config/settings.yaml` —
+  illustrative commission/slippage, not real broker figures, same caveat
+  as position sizing in Phase 5).
+- `screen_parameter_grid(...)` runs one screening per combination in a
+  parameter grid (only parameters with a stated economic justification
+  belong in a grid — Section 14).
+- `filter_top_candidates(results, top_n, min_trades)` — the concrete
+  "avoid wasting compute on obviously poor parameter regions" mechanism:
+  ranks by Sharpe ratio after excluding statistically unreliable
+  (too-few-trades) results, so only the survivors are worth Backtrader's
+  greater expense.
+- Every run is persisted as an `Experiment` row
+  (`src/backtest/experiment_store.py`, SQLite via SQLAlchemy — Section
+  29) with a unique ID, its parameters/metrics, and full reproducibility
+  metadata (Section 36): git commit hash, data-file fingerprint, Python
+  and library versions.
+
+No new CLI command — Section 38's CLI list has none for screening;
+`backtest`/`optimize` (Phases 7-8) will call into this engine directly.
+
+⚠️ **Verified dependency combination**: `vectorbt` 1.1.0 requires
+`pandas>=3.0.3` and `numpy>=2.4.6` in this environment's package index —
+notably *not* the `pandas<3`/`numpy<2` range assumed in Phase 1.
+`requirements.txt` now reflects what's actually verified working (the
+full test suite passes against pandas 3.0.5 / numpy 2.4.6). Separately,
+`vectorbt` 1.1.0 fails at import time against `plotly` 7.x (it references
+a `scattermapbox` property `plotly` removed) — the `plotly<6.0` pin is
+load-bearing, not cosmetic.
 
 ## CLI
 

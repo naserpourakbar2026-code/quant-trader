@@ -8,6 +8,7 @@ instead.
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -77,6 +78,18 @@ def ingest_one(
     df.to_csv(out_path, index=False)
     logger.info(f"Ingested {len(df)} rows for {symbol}/{timeframe} -> {out_path}")
     return IngestionResult(symbol, timeframe, status="ok", rows=len(df))
+
+
+def data_version_for(symbol: str, timeframe: str, processed_dir: Path | None = None) -> str:
+    """A short, stable fingerprint of the processed CSV backing this
+    symbol/timeframe (CLAUDE.md Section 36) — lets an experiment record
+    detect if its underlying data has since changed. "unknown" if the
+    file doesn't exist (never fabricated)."""
+    path = processed_csv_path(symbol, timeframe, processed_dir)
+    if not path.exists():
+        return "unknown"
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    return digest[:16]
 
 
 def run_download(

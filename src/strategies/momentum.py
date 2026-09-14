@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 from src.strategies import stops, targets
-from src.strategies.base import BaseStrategy, Signal, SignalDirection
+from src.strategies.base import BaseStrategy, SignalDirection
 
 DEFAULT_PARAMS = {
     "momentum_normalizer_pct": 1.0,  # |momentum_pct| at/beyond this counts as "full strength"
@@ -38,39 +38,49 @@ class MomentumMultiFactorStrategy(BaseStrategy):
     def __init__(self, params: dict | None = None):
         super().__init__({**DEFAULT_PARAMS, **(params or {})})
 
-    def _composite_score(self, df: pd.DataFrame) -> float:
-        last = df.iloc[-1]
+    def composite_score_series(self, df: pd.DataFrame) -> pd.Series:
+        """The multi-factor score, computed for every bar at once. Used by
+        generate_signals_vectorized() below and, unchanged, by the Phase 6
+        vectorbt research engine for whole-series screening."""
+        momentum_factor = (df["momentum_pct"] / self.params["momentum_normalizer_pct"]).clip(-1.0, 1.0)
+        breakout_factor = (df["breakout_strength"] / self.params["breakout_normalizer_atr"]).clip(-1.0, 1.0)
 
-        momentum_factor = np.clip(last["momentum_pct"] / self.params["momentum_normalizer_pct"], -1.0, 1.0)
-        breakout_factor = np.clip(last["breakout_strength"] / self.params["breakout_normalizer_atr"], -1.0, 1.0)
-
-        trend_direction = np.sign(last["ema_fast"] - last["ema_slow"])
-        trend_weight = _TREND_STRENGTH_WEIGHT.get(last["trend_regime"], 0.0)
+        trend_direction = np.sign(df["ema_fast"] - df["ema_slow"])
+        trend_weight = df["trend_regime"].map(_TREND_STRENGTH_WEIGHT).fillna(0.0)
         trend_factor = trend_direction * trend_weight
 
-        factors = [f for f in (momentum_factor, breakout_factor, trend_factor) if pd.notna(f)]
-        if not factors:
-            return 0.0
-        base_score = sum(factors) / len(factors)
+        factors = pd.concat([momentum_factor, breakout_factor, trend_factor], axis=1)
+        base_score = factors.mean(axis=1, skipna=True).fillna(0.0)
 
-        volume_window = df["tick_volume"].iloc[-self.params["volume_lookback"] :]
-        avg_volume = volume_window.mean()
-        volume_ratio = last["tick_volume"] / avg_volume if avg_volume and avg_volume > 0 else 1.0
-        volume_multiplier = float(np.clip(volume_ratio, 0.8, 1.2))
+        lookback = self.params["volume_lookback"]
+        avg_volume = df["tick_volume"].rolling(lookback, min_periods=lookback).mean()
+        volume_ratio = (df["tick_volume"] / avg_volume).where(avg_volume > 0, 1.0)
+        volume_multiplier = volume_ratio.clip(0.8, 1.2).fillna(1.0)
 
-        return float(np.clip(base_score * volume_multiplier, -1.0, 1.0))
+        return (base_score * volume_multiplier).clip(-1.0, 1.0)
 
-    def generate_signal(self, df: pd.DataFrame) -> Signal:
-        score = self._composite_score(df)
+    def generate_signals_vectorized(self, df: pd.DataFrame) -> pd.DataFrame:
+        score = self.composite_score_series(df)
 
-        direction = SignalDirection.FLAT
-        if score >= self.params["entry_threshold"]:
-            direction = SignalDirection.LONG
-        elif score <= -self.params["entry_threshold"]:
-            direction = SignalDirection.SHORT
+        # Plain strings, not SignalDirection instances -- see the note in
+        # src/strategies/trend_following.py's generate_signals_vectorized.
+        direction = pd.Series("FLAT", index=df.index, dtype=object)
+        long_cond = score >= self.params["entry_threshold"]
+        short_cond = score <= -self.params["entry_threshold"]
+        direction = direction.mask(long_cond, "LONG")
+        direction = direction.mask(short_cond, "SHORT")
+        actionable = long_cond | short_cond
 
-        confidence = min(abs(score), 1.0) if direction != SignalDirection.FLAT else 0.0
-        return self._build_signal(df, direction, confidence)
+        confidence = score.abs().clip(upper=1.0).where(actionable, 0.0)
+
+        stop_loss = stops.swing_stop_series(df, direction, lookback=self.params["swing_lookback"]).where(actionable)
+        take_profit = targets.r_multiple_target(
+            df["close"], stop_loss, direction, r_multiple=self.params["take_profit_r_multiple"]
+        ).where(actionable)
+
+        return pd.DataFrame(
+            {"direction": direction, "confidence": confidence, "stop_loss": stop_loss, "take_profit": take_profit}
+        )
 
     def calculate_stop_loss(self, df: pd.DataFrame, direction: SignalDirection) -> float:
         return stops.swing_stop(df, direction=direction.value, lookback=self.params["swing_lookback"])

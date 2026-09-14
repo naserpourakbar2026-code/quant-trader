@@ -41,6 +41,22 @@ data:
 execution:
   scenarios: [optimistic, realistic, stress]
   default_scenario: realistic
+  # Illustrative cost assumptions (CLAUDE.md Section 11), NOT real broker
+  # figures — actual spread/commission/slippage are broker- and
+  # symbol-specific and only become known once a broker adapter is
+  # connected (Phase 12/13). Spread itself comes from the data's own
+  # `spread` column where available; these two only add commission and
+  # slippage on top for the vectorbt/Backtrader engines' cost modeling.
+  costs:
+    optimistic:
+      commission_pct: 0.0
+      slippage_pct: 0.0
+    realistic:
+      commission_pct: 0.00007   # ~0.7 bps round-turn, a modest illustrative default
+      slippage_pct: 0.0001      # ~1 bp
+    stress:
+      commission_pct: 0.00015
+      slippage_pct: 0.0005
 
 validation:
   # Standard forex weekend closure window, used to tell an expected gap

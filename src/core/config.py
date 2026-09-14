@@ -74,9 +74,22 @@ class DataConfig(BaseModel):
         return v
 
 
+class CostScenario(BaseModel):
+    """Illustrative transaction-cost assumptions for one execution scenario
+    (CLAUDE.md Section 11) — NOT real broker figures. Real spread/commission/
+    slippage are broker- and symbol-specific and only become known once a
+    broker adapter is connected (Phase 12/13); until then these are stated
+    placeholders a screening/backtest run uses so costs aren't silently
+    zero, not a claim about any real broker's pricing."""
+
+    commission_pct: float = Field(ge=0)
+    slippage_pct: float = Field(ge=0)
+
+
 class ExecutionConfig(BaseModel):
     scenarios: list[str]
     default_scenario: str
+    costs: dict[str, CostScenario] = Field(default_factory=dict)
 
     @field_validator("default_scenario")
     @classmethod
@@ -85,6 +98,13 @@ class ExecutionConfig(BaseModel):
         if scenarios and v not in scenarios:
             raise ValueError(f"default_scenario {v!r} not in scenarios {scenarios}")
         return v
+
+    @model_validator(mode="after")
+    def every_scenario_has_a_cost_profile(self) -> "ExecutionConfig":
+        missing = [s for s in self.scenarios if s not in self.costs]
+        if missing:
+            raise ValueError(f"scenarios missing a cost profile in execution.costs: {missing}")
+        return self
 
 
 class ValidationConfig(BaseModel):

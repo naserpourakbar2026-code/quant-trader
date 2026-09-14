@@ -136,6 +136,6 @@ def test_volume_confirmation_can_tip_a_borderline_signal():
 def test_trend_regime_undefined_during_warmup_is_treated_as_zero_weight():
     strat = MomentumMultiFactorStrategy()
     df = _df(momentum_pct=0.6, breakout_strength=0.6, ema_fast=101.0, ema_slow=100.0, trend_regime=float("nan"))
-    score = strat._composite_score(df)
+    score = strat.composite_score_series(df).iloc[-1]
     # trend_factor contributes 0 (unknown regime -> zero weight), so score is the mean of the other two
     assert score == pytest.approx((0.6 + 0.6) / 3)

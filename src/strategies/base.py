@@ -1,10 +1,16 @@
 """Standard strategy interface every strategy family implements
 (CLAUDE.md Section 6).
 
-generate_signal(), calculate_stop_loss() and calculate_take_profit() are
-strategy-specific (each family's own economic logic); calculate_position_size()
-and validate_signal() are genuinely common risk/sanity logic and have a
-shared implementation here that subclasses can still override.
+calculate_stop_loss() and calculate_take_profit() are strategy-specific
+(each family's own economic logic). generate_signal() has a shared
+implementation here that delegates to generate_signals_vectorized() —
+each family's *actual* entry-condition logic, computed for the whole
+series at once. That single vectorized computation is read both by
+generate_signal() (for one live/paper bar) and by the Phase 6 vectorbt
+research engine (for fast whole-series screening), so the two can never
+silently diverge into "the same rule" implemented two different ways.
+calculate_position_size() and validate_signal() are genuinely common
+risk/sanity logic with a shared implementation here too.
 """
 from __future__ import annotations
 
@@ -51,10 +57,34 @@ class BaseStrategy(ABC):
         self.params: dict = params or {}
 
     @abstractmethod
+    def generate_signals_vectorized(self, df: pd.DataFrame) -> pd.DataFrame:
+        """The strategy's actual entry-condition logic, computed for every
+        row of `df` at once (one symbol/timeframe's feature-engineered
+        candle history — src.features.engine.compute_features output).
+
+        Returns a DataFrame aligned to `df`'s index with columns:
+          - "direction": SignalDirection per bar
+          - "confidence": float in [0, 1], 0.0 where direction is FLAT
+          - "stop_loss", "take_profit": float price levels, NaN where
+            direction is FLAT — the same formulas as calculate_stop_loss()/
+            calculate_take_profit(), evaluated for the whole series. This
+            makes the table strategy-agnostic: the Phase 6 vectorbt
+            research engine reads only these four columns and never needs
+            to know which stop/target type a given family uses.
+        """
+
     def generate_signal(self, df: pd.DataFrame) -> Signal:
-        """`df` is one symbol/timeframe's feature-engineered candle history
-        (src.features.engine.compute_features output); the signal is
-        generated from its last row."""
+        """Single-bar convenience wrapper: the live/paper-trading view of
+        generate_signals_vectorized()'s last row."""
+        table = self.generate_signals_vectorized(df)
+        last = table.iloc[-1]
+        # generate_signals_vectorized() stores plain "LONG"/"SHORT"/"FLAT"
+        # strings, not SignalDirection instances: pandas' .mask()/.where()
+        # silently corrupts a str-subclass Enum used as a scalar fill/
+        # replacement value (it gets treated as an array-like of
+        # characters internally) even though comparisons against one work
+        # fine — see src/strategies/trend_following.py for the same note.
+        return self._build_signal(df, SignalDirection(last["direction"]), float(last["confidence"]))
 
     @abstractmethod
     def calculate_stop_loss(self, df: pd.DataFrame, direction: SignalDirection) -> float:

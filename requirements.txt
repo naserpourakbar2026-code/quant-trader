@@ -1,10 +1,20 @@
 # Core numerical / data stack
-pandas>=2.1,<3.0
-numpy>=1.26,<2.0
+# pandas/numpy's lower bounds are set by vectorbt below (it requires
+# pandas>=3.0.3 and numpy>=2.4.6 in this environment's package index),
+# not by pandas/numpy/scipy's own compatibility — verified working
+# end-to-end (full test suite) against pandas 3.0.5 / numpy 2.4.6.
+pandas>=3.0.3,<4.0
+numpy>=2.4.6,<3.0
 scipy>=1.11,<2.0
 
 # Research & backtesting engines
-vectorbt>=0.26,<0.27          # open-source edition (NOT vectorbt PRO)
+# vectorbt: open-source edition (pip package "vectorbt", NOT "vectorbtpro").
+# Verified working combination in this environment (Python 3.11, pandas
+# 2.3.3, numpy 1.26.4): vectorbt 1.1.x + plotly <6.0 — vectorbt 1.1.0
+# fails at import time against plotly 7.x (a `scattermapbox` property
+# vectorbt's default theme references was removed there), so the plotly
+# pin below is load-bearing, not cosmetic.
+vectorbt>=1.1,<1.2
 backtrader>=1.9.78,<2.0
 
 # Optimization & stats

@@ -61,7 +61,11 @@ def test_risk_per_trade_must_be_in_allowed_levels():
                 "timeframes": ["H1"],
                 "source": "csv",
             },
-            execution={"scenarios": ["realistic"], "default_scenario": "realistic"},
+            execution={
+                "scenarios": ["realistic"],
+                "default_scenario": "realistic",
+                "costs": {"realistic": {"commission_pct": 0.00007, "slippage_pct": 0.0001}},
+            },
             validation={
                 "weekend_close_day": 4,
                 "weekend_close_hour": 21,

@@ -11,8 +11,14 @@ class _DummyStrategy(BaseStrategy):
 
     strategy_name = "dummy"
 
-    def generate_signal(self, df: pd.DataFrame) -> Signal:
-        return self._build_signal(df, SignalDirection.LONG, confidence=0.5)
+    def generate_signals_vectorized(self, df: pd.DataFrame) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "direction": ["LONG"] * len(df),
+                "confidence": [0.5] * len(df),
+            },
+            index=df.index,
+        )
 
     def calculate_stop_loss(self, df: pd.DataFrame, direction: SignalDirection) -> float:
         last = df.iloc[-1]
