@@ -22,6 +22,7 @@ VALID_FEATURES_KWARGS = {
     "bollinger_period": 20,
     "bollinger_std": 2.0,
     "rsi_period": 14,
+    "adx_period": 14,
     "momentum_period": 10,
     "trend_slope_lookback": 10,
     "trend_strong_threshold": 1.0,

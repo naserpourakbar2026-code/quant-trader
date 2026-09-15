@@ -138,6 +138,7 @@ class FeaturesConfig(BaseModel):
     bollinger_period: int = Field(gt=0)
     bollinger_std: float = Field(gt=0)
     rsi_period: int = Field(gt=0)
+    adx_period: int = Field(gt=0)
     momentum_period: int = Field(gt=0)
     trend_slope_lookback: int = Field(gt=0)
     trend_strong_threshold: float = Field(gt=0)

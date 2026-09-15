@@ -85,3 +85,31 @@ def distance_from_ma_atr(series: pd.Series, ma: pd.Series, atr_series: pd.Series
     """Distance from a moving average expressed in ATR units — comparable
     across symbols and volatility regimes, unlike a raw price distance."""
     return (series - ma) / atr_series.replace(0, np.nan)
+
+
+def adx(df: pd.DataFrame, period: int) -> pd.DataFrame:
+    """Wilder's ADX (+DI/-DI/ADX): an objective measure of trend strength,
+    independent of direction — derived purely from directional price
+    movement (+DM/-DM), smoothed the same way as ATR, rather than from
+    EMA slope (how src/features/regime.classify_trend measures strength)."""
+    if period < 1:
+        raise ValueError(f"period must be >= 1, got {period}")
+
+    up_move = df["high"].diff()
+    down_move = -df["low"].diff()
+    plus_dm = up_move.where((up_move > down_move) & (up_move > 0), 0.0)
+    minus_dm = down_move.where((down_move > up_move) & (down_move > 0), 0.0)
+
+    smoothed_tr = true_range(df).ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
+    smoothed_plus_dm = plus_dm.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
+    smoothed_minus_dm = minus_dm.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
+
+    safe_tr = smoothed_tr.replace(0, np.nan)
+    plus_di = 100 * smoothed_plus_dm / safe_tr
+    minus_di = 100 * smoothed_minus_dm / safe_tr
+
+    di_sum = (plus_di + minus_di).replace(0, np.nan)
+    dx = 100 * (plus_di - minus_di).abs() / di_sum
+    adx_series = dx.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
+
+    return pd.DataFrame({"plus_di": plus_di, "minus_di": minus_di, "adx": adx_series})

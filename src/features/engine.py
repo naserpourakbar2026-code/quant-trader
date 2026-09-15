@@ -27,6 +27,7 @@ class FeatureParams:
     bollinger_period: int = 20
     bollinger_std: float = 2.0
     rsi_period: int = 14
+    adx_period: int = 14
     momentum_period: int = 10
     trend_slope_lookback: int = 10
     trend_strong_threshold: float = 1.0
@@ -65,6 +66,7 @@ def compute_features(df: pd.DataFrame, params: FeatureParams | None = None) -> p
     out = pd.concat([out, ind.bollinger_bands(out["close"], p.bollinger_period, p.bollinger_std)], axis=1)
 
     out["rsi"] = ind.rsi(out["close"], p.rsi_period)
+    out = pd.concat([out, ind.adx(out, p.adx_period)], axis=1)
     out["momentum_pct"] = ind.rate_of_change(out["close"], p.momentum_period)
     out["distance_from_ema_slow_pct"] = ind.distance_from_ma_pct(out["close"], out["ema_slow"])
     out["distance_from_ema_slow_atr"] = ind.distance_from_ma_atr(out["close"], out["ema_slow"], out["atr"])

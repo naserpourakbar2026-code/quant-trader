@@ -88,6 +88,7 @@ features:
   bollinger_period: 20
   bollinger_std: 2.0
   rsi_period: 14
+  adx_period: 14                # Wilder's ADX: objective trend-strength measure, independent of direction
   momentum_period: 10
   trend_slope_lookback: 10       # bars over which the slow-EMA slope is measured
   trend_strong_threshold: 1.0    # ATR-normalized slope magnitude for "strong_trend"

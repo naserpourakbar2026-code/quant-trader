@@ -82,3 +82,34 @@ def test_distance_from_ma_pct_and_atr():
 def test_distance_from_ma_pct_handles_zero_ma():
     result = ind.distance_from_ma_pct(pd.Series([1.0]), pd.Series([0.0]))
     assert math.isnan(result.iloc[0])
+
+
+def test_adx_rejects_nonpositive_period():
+    df = pd.DataFrame({"high": [1.0, 2.0], "low": [0.0, 1.0], "close": [0.5, 1.5]})
+    with pytest.raises(ValueError):
+        ind.adx(df, 0)
+
+
+def test_adx_strong_uptrend_plus_di_dominates_minus_di():
+    n = 20
+    high = pd.Series(range(1, n + 1)).astype(float)
+    low = high - 1.0
+    close = high - 0.5
+    df = pd.DataFrame({"high": high, "low": low, "close": close})
+
+    out = ind.adx(df, 3)
+
+    assert out["minus_di"].iloc[-1] == pytest.approx(0.0)
+    assert out["plus_di"].iloc[-1] > 50.0
+    assert out["adx"].iloc[-1] > 50.0
+
+
+def test_adx_zero_volatility_is_nan_not_zero():
+    """No true range at all (flat OHLC) makes +DI/-DI/ADX undefined --
+    Section 3's "never fabricate" applies here too: NaN, not a
+    misleading 0."""
+    df = pd.DataFrame({"high": [1.0] * 10, "low": [1.0] * 10, "close": [1.0] * 10})
+    out = ind.adx(df, 3)
+    assert out["plus_di"].isna().all()
+    assert out["minus_di"].isna().all()
+    assert out["adx"].isna().all()

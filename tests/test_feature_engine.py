@@ -17,6 +17,9 @@ EXPECTED_NEW_COLUMNS = [
     "bb_lower",
     "bb_width_pct",
     "rsi",
+    "plus_di",
+    "minus_di",
+    "adx",
     "momentum_pct",
     "distance_from_ema_slow_pct",
     "distance_from_ema_slow_atr",
@@ -58,6 +61,7 @@ SMALL_PARAMS = FeatureParams(
     bollinger_period=6,
     bollinger_std=2.0,
     rsi_period=5,
+    adx_period=5,
     momentum_period=3,
     trend_slope_lookback=4,
     trend_strong_threshold=1.0,
@@ -120,6 +124,7 @@ def test_feature_params_from_settings_matches_config():
     cfg = load_settings().features
     assert params.ema_fast_period == cfg.ema_fast_period
     assert params.rsi_period == cfg.rsi_period
+    assert params.adx_period == cfg.adx_period
 
 
 def test_breakout_strength_is_zero_inside_channel_and_signed_on_breakout():
