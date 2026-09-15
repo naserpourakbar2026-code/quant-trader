@@ -8,6 +8,7 @@ EXPECTED_DIRS = [
     "data/processed",
     "data/cache",
     "src/data",
+    "src/data/sources",
     "src/features",
     "src/strategies",
     "src/risk",

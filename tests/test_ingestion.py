@@ -1,6 +1,8 @@
 import pandas as pd
 
+from src.data import ingestion as ingestion_module
 from src.data.ingestion import ingest_one, processed_csv_path, run_download
+from src.data.sources.twelve_data import TwelveDataAuthError
 
 
 def _write_raw_csv(raw_dir, symbol, timeframe, rows=2):
@@ -31,6 +33,43 @@ def test_ingest_one_reports_missing_when_raw_file_absent(tmp_path):
     assert result.status == "missing"
     assert result.rows == 0
     assert "No raw CSV found" in result.message
+
+
+def test_ingest_one_uses_twelvedata_when_source_overridden(tmp_path, monkeypatch):
+    processed_dir = tmp_path / "processed"
+    fake_df = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2024-01-01T00:00:00Z"]),
+            "symbol": ["EURUSD"],
+            "timeframe": ["H1"],
+            "open": [1.1],
+            "high": [1.2],
+            "low": [1.0],
+            "close": [1.15],
+            "tick_volume": [float("nan")],
+            "spread": [float("nan")],
+            "real_volume": [float("nan")],
+        }
+    )
+    monkeypatch.setattr(ingestion_module, "fetch_twelvedata_ohlcv", lambda *a, **k: fake_df)
+
+    result = ingest_one("EURUSD", "H1", processed_dir=processed_dir, source="twelvedata")
+
+    assert result.status == "ok"
+    assert result.rows == 1
+    assert processed_csv_path("EURUSD", "H1", processed_dir=processed_dir).exists()
+
+
+def test_ingest_one_reports_error_when_twelvedata_api_key_missing(tmp_path, monkeypatch):
+    def _raise(*a, **k):
+        raise TwelveDataAuthError("TWELVE_DATA_API_KEY is not set.")
+
+    monkeypatch.setattr(ingestion_module, "fetch_twelvedata_ohlcv", _raise)
+
+    result = ingest_one("EURUSD", "H1", processed_dir=tmp_path / "processed", source="twelvedata")
+
+    assert result.status == "error"
+    assert "TWELVE_DATA_API_KEY" in result.message
 
 
 def test_run_download_iterates_requested_symbols_and_timeframes(tmp_path):

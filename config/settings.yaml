@@ -36,7 +36,16 @@ data:
   optional_symbols:               # kept separate from forex results (different vol regime)
     - XAUUSD
   timeframes: [M5, M15, M30, H1, H4]
-  source: csv                    # csv | mt5
+  source: csv                    # csv | mt5 | twelvedata
+  twelvedata:                    # Section 2, source C: https://twelvedata.com REST API
+    enabled: false                # set true, or pass `download-data --source twelvedata`
+    api_key_env: TWELVE_DATA_API_KEY   # secret lives in .env, never here (Section 42)
+    rate_limit:
+      requests_per_second: 1      # free plan: keep >=1s between calls (Section 25)
+    timeout_seconds: 10
+    max_retries: 3
+    retry_base_delay_seconds: 1.0
+    output_size: 5000             # candles per request
 
 execution:
   scenarios: [optimistic, realistic, stress]

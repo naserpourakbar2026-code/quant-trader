@@ -17,6 +17,7 @@ from src.core.config import PROJECT_ROOT, load_settings
 from src.core.logging import get_system_logger
 from src.data.csv_loader import load_csv
 from src.data.mt5_loader import MT5UnavailableError
+from src.data.sources.twelve_data import TwelveDataError, fetch_ohlcv as fetch_twelvedata_ohlcv
 
 
 @dataclass
@@ -41,10 +42,11 @@ def ingest_one(
     end: datetime | None = None,
     raw_dir: Path | None = None,
     processed_dir: Path | None = None,
+    source: str | None = None,
 ) -> IngestionResult:
     settings = load_settings()
     logger = get_system_logger()
-    source = settings.data.source
+    source = source or settings.data.source
 
     try:
         if source == "csv":
@@ -59,12 +61,27 @@ def ingest_one(
                 df = mt5_loader.fetch_rates(symbol, timeframe, start, end)
             finally:
                 mt5_loader.disconnect()
+        elif source == "twelvedata":
+            td_cfg = settings.data.twelvedata
+            rate_limit = td_cfg.rate_limit if isinstance(td_cfg.rate_limit, dict) else {}
+            df = fetch_twelvedata_ohlcv(
+                symbol,
+                timeframe,
+                start=start.date().isoformat() if start else None,
+                end=end.date().isoformat() if end else None,
+                output_size=td_cfg.output_size,
+                api_key_env=td_cfg.api_key_env,
+                requests_per_second=rate_limit.get("requests_per_second", 1.0),
+                timeout_seconds=td_cfg.timeout_seconds,
+                max_retries=td_cfg.max_retries,
+                retry_base_delay_seconds=td_cfg.retry_base_delay_seconds,
+            )
         else:
             raise ValueError(f"Unsupported data source {source!r}")
     except FileNotFoundError as exc:
         logger.warning(str(exc))
         return IngestionResult(symbol, timeframe, status="missing", rows=0, message=str(exc))
-    except (MT5UnavailableError, ValueError) as exc:
+    except (MT5UnavailableError, TwelveDataError, ValueError) as exc:
         logger.warning(str(exc))
         return IngestionResult(symbol, timeframe, status="error", rows=0, message=str(exc))
 
@@ -100,12 +117,13 @@ def run_download(
     end: datetime | None = None,
     raw_dir: Path | None = None,
     processed_dir: Path | None = None,
+    source: str | None = None,
 ) -> list[IngestionResult]:
     settings = load_settings()
     syms = symbols or settings.data.symbols
     tfs = timeframes or settings.data.timeframes
     return [
-        ingest_one(s, t, start=start, end=end, raw_dir=raw_dir, processed_dir=processed_dir)
+        ingest_one(s, t, start=start, end=end, raw_dir=raw_dir, processed_dir=processed_dir, source=source)
         for s in syms
         for t in tfs
     ]

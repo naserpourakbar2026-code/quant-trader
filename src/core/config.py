@@ -59,16 +59,31 @@ class AccountConfig(BaseModel):
     currency: str
 
 
+class TwelveDataSourceConfig(BaseModel):
+    """config/settings.yaml `data.twelvedata` block (CLAUDE.md Section 2,
+    source C). The API key itself is never here — only the name of the
+    .env variable holding it (CLAUDE.md Section 42)."""
+
+    enabled: bool = False
+    api_key_env: str = "TWELVE_DATA_API_KEY"
+    rate_limit: dict = Field(default_factory=lambda: {"requests_per_second": 1.0})
+    timeout_seconds: float = 10.0
+    max_retries: int = 3
+    retry_base_delay_seconds: float = 1.0
+    output_size: int = 5000
+
+
 class DataConfig(BaseModel):
     symbols: list[str]
     optional_symbols: list[str] = Field(default_factory=list)
     timeframes: list[str]
     source: str
+    twelvedata: TwelveDataSourceConfig = Field(default_factory=TwelveDataSourceConfig)
 
     @field_validator("source")
     @classmethod
     def source_must_be_supported(cls, v: str) -> str:
-        allowed = {"csv", "mt5"}
+        allowed = {"csv", "mt5", "twelvedata"}
         if v not in allowed:
             raise ValueError(f"data.source must be one of {allowed}, got {v!r}")
         return v

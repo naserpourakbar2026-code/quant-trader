@@ -61,7 +61,7 @@ def cmd_download_data(args: argparse.Namespace) -> int:
     start = datetime.fromisoformat(args.start) if args.start else None
     end = datetime.fromisoformat(args.end) if args.end else None
 
-    results = run_download(symbols=symbols, timeframes=timeframes, start=start, end=end)
+    results = run_download(symbols=symbols, timeframes=timeframes, start=start, end=end, source=args.source)
     ok = [r for r in results if r.status == "ok"]
     missing = [r for r in results if r.status == "missing"]
     errors = [r for r in results if r.status == "error"]
@@ -489,6 +489,10 @@ def build_parser() -> argparse.ArgumentParser:
     download_parser.add_argument("--timeframe", help="Limit to one timeframe (default: all configured timeframes)")
     download_parser.add_argument("--start", help="ISO date, required for mt5 source (e.g. 2024-01-01)")
     download_parser.add_argument("--end", help="ISO date, required for mt5 source")
+    download_parser.add_argument(
+        "--source", choices=["csv", "mt5", "twelvedata"],
+        help="Override data.source from settings.yaml for this run",
+    )
     download_parser.set_defaults(func=cmd_download_data)
 
     validate_parser = subparsers.add_parser(
