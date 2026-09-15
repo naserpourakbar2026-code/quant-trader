@@ -1,0 +1,47 @@
+# Core numerical / data stack
+# pandas/numpy's lower bounds are set by vectorbt below (it requires
+# pandas>=3.0.3 and numpy>=2.4.6 in this environment's package index),
+# not by pandas/numpy/scipy's own compatibility — verified working
+# end-to-end (full test suite) against pandas 3.0.5 / numpy 2.4.6.
+pandas>=3.0.3,<4.0
+numpy>=2.4.6,<3.0
+scipy>=1.11,<2.0
+
+# Research & backtesting engines
+# vectorbt: open-source edition (pip package "vectorbt", NOT "vectorbtpro").
+# Verified working combination in this environment (Python 3.11, pandas
+# 2.3.3, numpy 1.26.4): vectorbt 1.1.x + plotly <6.0 — vectorbt 1.1.0
+# fails at import time against plotly 7.x (a `scattermapbox` property
+# vectorbt's default theme references was removed there), so the plotly
+# pin below is load-bearing, not cosmetic.
+vectorbt>=1.1,<1.2
+backtrader>=1.9.78,<2.0
+
+# Optimization & stats
+# optuna 5.0.0 is the version actually available/verified in this
+# environment's package index — not 3.5-3.x as originally guessed in Phase 1.
+optuna>=5.0,<6.0
+scikit-learn>=1.4,<2.0
+statsmodels>=0.14,<0.15
+
+# Reporting
+matplotlib>=3.8,<4.0
+plotly>=5.18,<6.0
+
+# Config / validation
+pydantic>=2.6,<3.0
+PyYAML>=6.0,<7.0
+
+# Persistence
+SQLAlchemy>=2.0,<3.0
+
+# Networking (broker APIs)
+requests>=2.31,<3.0
+websockets>=12.0,<13.0
+
+# Testing & logging
+pytest>=8.0,<9.0
+pytest-cov>=4.1,<5.0
+loguru>=0.7,<0.8
+
+python-dotenv>=1.0,<2.0

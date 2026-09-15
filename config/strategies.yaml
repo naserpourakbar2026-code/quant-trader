@@ -1,0 +1,69 @@
+# Strategy definitions and their tunable parameters (CLAUDE.md Section 5).
+#
+# Three independent strategy families, implemented in src/strategies/.
+# `enabled: true` here only means "available to run" — it is not a claim
+# that the strategy is profitable; that is decided empirically starting
+# in Phase 6 (vectorbt screening) and Phase 7 (Backtrader validation), and
+# only trusted after Phase 9's walk-forward out-of-sample test.
+#
+# Parameter periods (ema/atr/bollinger/rsi/donchian) intentionally match
+# config/settings.yaml's `features:` block, since strategies consume that
+# same shared feature set. Only parameters with a logical economic/trading
+# justification are exposed for later Optuna sweeps (Phase 8, Section 14).
+
+stop_loss_types: [atr, swing, fixed_pct, volatility]
+take_profit_ratios: [1.0, 1.5, 2.0, 3.0]   # plus atr_target / trailing / break_even / partial, handled in code
+
+strategies:
+  trend_following:
+    family: trend_following
+    enabled: true
+    symbols: [EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, EURJPY, GBPJPY]
+    timeframes: [M15, H1, H4]
+    parameters:
+      atr_stop_multiplier: 2.0
+      take_profit_r_multiple: 2.0
+      require_non_low_vol: true
+    # Phase 8 (Optuna): breakout period + stop/TP multipliers, exactly
+    # Section 14's example list for a breakout strategy. donchian_period
+    # is a feature-level param (config/settings.yaml `features:`) — the
+    # optimizer routes each suggested param to the feature engine or the
+    # strategy's own params based on where its name is actually defined.
+    optimization_space:
+      donchian_period: {type: int, low: 10, high: 40}
+      atr_stop_multiplier: {type: float, low: 1.0, high: 3.0}
+      take_profit_r_multiple: {type: float, low: 1.0, high: 3.0}
+
+  mean_reversion:
+    family: mean_reversion
+    enabled: true
+    symbols: [EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, EURJPY, GBPJPY]
+    timeframes: [M15, H1, H4]
+    parameters:
+      rsi_oversold: 30.0
+      rsi_overbought: 70.0
+      atr_stop_multiplier: 1.5
+    # Bollinger period/deviation + RSI thresholds, per Section 14.
+    optimization_space:
+      bollinger_period: {type: int, low: 10, high: 40}
+      bollinger_std: {type: float, low: 1.5, high: 3.0}
+      rsi_oversold: {type: float, low: 15.0, high: 35.0}
+      rsi_overbought: {type: float, low: 65.0, high: 85.0}
+
+  momentum_multi_factor:
+    family: momentum_multi_factor
+    enabled: true
+    symbols: [EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD, EURJPY, GBPJPY]
+    timeframes: [M15, H1, H4]
+    parameters:
+      momentum_normalizer_pct: 1.0
+      breakout_normalizer_atr: 1.0
+      entry_threshold: 0.5
+      volume_lookback: 20
+      swing_lookback: 10
+      take_profit_r_multiple: 2.0
+    # Momentum period + entry threshold + TP multiple, per Section 14.
+    optimization_space:
+      momentum_period: {type: int, low: 5, high: 30}
+      entry_threshold: {type: float, low: 0.3, high: 0.8}
+      take_profit_r_multiple: {type: float, low: 1.0, high: 3.0}

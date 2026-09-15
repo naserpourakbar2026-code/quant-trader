@@ -1,0 +1,173 @@
+# Global framework settings.
+# No important values are hard-coded in code — everything trading-relevant
+# lives here (or in strategies.yaml / brokers.yaml) and is loaded through
+# src/core/config.py into validated pydantic models.
+
+account:
+  initial_capital: 2000          # EUR
+  currency: EUR
+
+risk:
+  risk_per_trade: 0.005          # 0.5% default; allowed: 0.0025 / 0.005 / 0.0075 / 0.01
+  allowed_risk_levels: [0.0025, 0.005, 0.0075, 0.01]
+  max_daily_loss: 0.03           # fraction of equity
+  max_weekly_loss: 0.08
+  max_portfolio_drawdown: 0.15   # hard kill switch threshold
+  max_open_positions: 5
+  max_correlated_exposure: 0.02  # fraction of equity across correlated symbols
+  max_leverage: 30
+  max_margin_usage: 0.5
+  daily_trade_limit: 10
+  cooldown_after_consecutive_losses:
+    losses: 3
+    cooldown_bars: 12
+
+data:
+  symbols:
+    - EURUSD
+    - GBPUSD
+    - USDJPY
+    - AUDUSD
+    - USDCAD
+    - USDCHF
+    - NZDUSD
+    - EURJPY
+    - GBPJPY
+  optional_symbols:               # kept separate from forex results (different vol regime)
+    - XAUUSD
+  timeframes: [M5, M15, M30, H1, H4]
+  source: csv                    # csv | mt5 | twelvedata
+  twelvedata:                    # Section 2, source C: https://twelvedata.com REST API
+    enabled: false                # set true, or pass `download-data --source twelvedata`
+    api_key_env: TWELVE_DATA_API_KEY   # secret lives in .env, never here (Section 42)
+    rate_limit:
+      requests_per_second: 1      # free plan: keep >=1s between calls (Section 25)
+    timeout_seconds: 10
+    max_retries: 3
+    retry_base_delay_seconds: 1.0
+    output_size: 5000             # candles per request
+
+execution:
+  scenarios: [optimistic, realistic, stress]
+  default_scenario: realistic
+  # Illustrative cost assumptions (CLAUDE.md Section 11), NOT real broker
+  # figures — actual spread/commission/slippage are broker- and
+  # symbol-specific and only become known once a broker adapter is
+  # connected (Phase 12/13). Spread itself comes from the data's own
+  # `spread` column where available; these two only add commission and
+  # slippage on top for the vectorbt/Backtrader engines' cost modeling.
+  costs:
+    optimistic:
+      commission_pct: 0.0
+      slippage_pct: 0.0
+    realistic:
+      commission_pct: 0.00007   # ~0.7 bps round-turn, a modest illustrative default
+      slippage_pct: 0.0001      # ~1 bp
+    stress:
+      commission_pct: 0.00015
+      slippage_pct: 0.0005
+
+validation:
+  # Standard forex weekend closure window, used to tell an expected gap
+  # (market closed) apart from a genuine missing candle. Broker-specific —
+  # adjust if your broker's calendar differs. Times are UTC.
+  weekend_close_day: 4        # Friday (0=Monday)
+  weekend_close_hour: 21
+  weekend_open_day: 6         # Sunday
+  weekend_open_hour: 21
+  spread_outlier_zscore: 3.0  # spreads beyond this many std-devs are "abnormal"
+
+features:
+  # Shared indicator periods/thresholds used by the feature engine and,
+  # downstream, by every strategy family (CLAUDE.md Section 5). Only
+  # parameters with a logical trading justification — no arbitrary knobs.
+  ema_fast_period: 20
+  ema_slow_period: 50
+  atr_period: 14
+  donchian_period: 20
+  bollinger_period: 20
+  bollinger_std: 2.0
+  rsi_period: 14
+  adx_period: 14                # Wilder's ADX: objective trend-strength measure, independent of direction
+  momentum_period: 10
+  trend_slope_lookback: 10       # bars over which the slow-EMA slope is measured
+  trend_strong_threshold: 1.0    # ATR-normalized slope magnitude for "strong_trend"
+  trend_weak_threshold: 0.3      # ATR-normalized slope magnitude for "weak_trend"
+  volatility_lookback: 100       # trailing window for the ATR percentile rank
+  volatility_low_percentile: 25.0
+  volatility_high_percentile: 75.0
+  range_squeeze_lookback: 20     # trailing window for the Bollinger-width squeeze check
+
+optimization:
+  # CLAUDE.md Section 14: composite objective = Profit Factor + Sharpe +
+  # Sortino + Expectancy, penalized by max drawdown, low trade count, and
+  # (post-hoc, see Section 16 / src/optimization/optuna_engine.py) high
+  # parameter sensitivity. Weights below are stated, adjustable defaults,
+  # not a claim of optimality.
+  n_trials: 50
+  min_trades: 10          # trials with fewer trades than this are heavily penalized (unreliable sample)
+  random_seed: 42         # reproducibility (CLAUDE.md Section 36)
+  weights:
+    profit_factor_cap: 5.0     # caps a zero-losing-trade run's profit factor rather than treating it as infinite
+    drawdown_penalty: 10.0     # multiplier on |max_drawdown|
+    trade_count_penalty: 0.5   # multiplier per trade short of min_trades
+  stability:
+    neighbor_step_pct: 0.10    # float params: +/- this fraction when checking neighborhood stability
+    neighbor_step_int: 1       # int params: +/- this many steps
+
+montecarlo:
+  # CLAUDE.md Section 17: bootstrap-resample a strategy's own historical
+  # trade returns (from the vectorbt screening engine, Phase 6) to
+  # estimate a distribution of outcomes rather than trusting the single
+  # historical sequence. Values below are stated, adjustable defaults.
+  n_simulations: 1000
+  random_seed: 42
+  ruin_threshold: 0.5          # equity <= this fraction of initial capital during a simulation counts as "ruin"
+  execution_noise_std: 0.0002  # extra Gaussian noise per resampled trade return, modeling slippage/execution variation
+  min_trades: 10               # fewer observed trades than this -> results reported but flagged unreliable
+  fragility:
+    max_probability_of_ruin: 0.05
+    max_probability_of_negative_return: 0.5
+
+portfolio:
+  # CLAUDE.md Section 20: analyze strategy x symbol x timeframe
+  # combinations, but only carry the statistically-usable, best-ranked
+  # survivors into the correlation/allocation step (Section 12's "avoid
+  # wasting compute" applies here too -- a huge correlation matrix isn't
+  # more informative, just noisier).
+  top_n: 10
+  min_trades: 10
+  allocation_methods: [equal_weight, inverse_volatility]
+
+robustness:
+  # CLAUDE.md Sections 31-32: the Final Robustness Score (0-100) and the
+  # minimum bar to be selected as one of the top-3 "robust" candidates.
+  # Weights are a stated, adjustable default (Section 31: "no single
+  # metric should dominate") -- not a claim of optimality, and they must
+  # sum to 1.0 (validated in src/core/config.py).
+  min_pass_score: 60.0
+  sharpe_reference: 2.0             # a Sharpe at/above this scores 100 on that sub-factor
+  cost_stress_spread_multipliers: [1.0, 1.5, 2.0, 3.0]   # CLAUDE.md Section 34
+  weights:
+    oos_performance: 0.20
+    drawdown: 0.20
+    profit_factor: 0.15
+    sharpe_sortino: 0.15
+    parameter_stability: 0.10
+    monte_carlo_robustness: 0.10
+    cost_sensitivity: 0.05
+    trade_count_reliability: 0.05
+
+live_trading: false               # never true by default; see .env LIVE_TRADING/LIVE_CONFIRMATION
+
+paths:
+  data_raw: data/raw
+  data_processed: data/processed
+  data_cache: data/cache
+  reports: reports
+  logs: logs
+
+logging:
+  level: INFO
+  trade_log_file: logs/trades.log
+  system_log_file: logs/system.log
